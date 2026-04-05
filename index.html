@@ -3,62 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rubik's El Salvador — Contest Online</title>
+  <title>CubitOS SV — Contest Online</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/additions.css" />
+  <!-- cubing.js — visualizador 2D/3D de puzzles WCA -->
   <script src="https://cdn.cubing.net/v0/js/cubing/twisty" type="module"></script>
-  <style>
-    .live-badge {
-      display: inline-flex; align-items: center; gap: .4rem;
-      font-family: 'Space Mono', monospace; font-size: .65rem;
-      letter-spacing: .12em; text-transform: uppercase;
-      color: var(--accent2); border: 1px solid var(--accent2);
-      border-radius: 2px; padding: .25rem .6rem;
-    }
-    .live-dot {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: var(--accent2); animation: livePulse 1s ease-in-out infinite;
-    }
-    @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.3} }
-
-    .modal-label {
-      display:block; font-family:'Space Mono',monospace; font-size:.7rem;
-      letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
-      margin-bottom:.5rem;
-    }
-    .modal-error {
-      font-family:'Space Mono',monospace; font-size:.75rem;
-      color:var(--accent2); margin-top:.5rem; min-height:1.1em;
-    }
-    .landing-secondary {
-      margin-top:1rem; font-family:'Space Mono',monospace; font-size:.78rem;
-      color:var(--muted); background:none; border:none; cursor:pointer;
-      text-decoration:underline; text-underline-offset:3px;
-      transition:color .2s; padding:0;
-    }
-    .landing-secondary:hover { color:var(--accent); }
-
-    /* Estilos propios del timer */
-    .timer-display.inspection      { color: #fff; }
-    .timer-display.inspection.warn { color: var(--accent3); }
-    .timer-display.inspection.plus2-warn { color: var(--accent2); }
-    .timer-display.inspection.hold-yellow { color: var(--accent3); }
-    .timer-display.inspection.hold-green  { color: var(--accent);  }
-    .cube-preview-wrap        { width:100%; max-width:360px; text-align:center; }
-    .cube-preview-label       { font-family:'Space Mono',monospace; font-size:.62rem;
-                                letter-spacing:.15em; text-transform:uppercase;
-                                color:var(--muted); margin-bottom:.5rem; }
-    .cube-preview-container   { width:100%; background:var(--bg);
-                                border:1px solid var(--border); border-radius:8px;
-                                overflow:hidden; }
-    .own-badge {
-      display:inline-block; font-size:.65rem; font-family:'Space Mono',monospace;
-      background:rgba(0,229,160,.15); color:var(--accent); border:1px solid var(--accent);
-      border-radius:2px; padding:0 .4rem; margin-left:.4rem; vertical-align:middle;
-    }
-    .own-row td { background: rgba(0,229,160,.04); }
-  </style>
 </head>
 <body>
 <div id="app">
@@ -72,11 +23,13 @@
     </div>
   </header>
 
-  <!-- ══ LANDING ═══════════════════════════════════════ -->
+  <!-- ══ VISTA: LANDING ══════════════════════════════ -->
   <div class="view active" id="view-landing">
     <div class="landing-eyebrow">🇸🇻 Comunidad Rubik El Salvador</div>
     <h1 class="landing-title">
-      Contest<br><span class="hl">Semana #2</span><br><span class="hl2">Abril</span>
+      Contest<br>
+      <span class="hl">Semana 2</span><br>
+      <span class="hl2">Abril</span>
     </h1>
     <p class="landing-sub">
       Competí desde casa. Tus tiempos se registran automáticamente
@@ -85,12 +38,9 @@
     <button class="btn btn-primary" onclick="UI.showRegistration()">
       ▶ Participar en el Contest
     </button>
-    <button class="landing-secondary" onclick="UI.showEmailLogin()">
-      Ya participé — ver mis resultados
-    </button>
   </div>
 
-  <!-- ══ REGISTRO ══════════════════════════════════════ -->
+  <!-- ══ VISTA: REGISTRO ═════════════════════════════ -->
   <div class="view" id="view-register">
     <div class="form-container">
       <div class="form-title">Registro</div>
@@ -120,7 +70,7 @@
     </div>
   </div>
 
-  <!-- ══ TIMER / CONTEST ═══════════════════════════════ -->
+  <!-- ══ VISTA: TIMER / CONTEST ══════════════════════ -->
   <div class="view" id="view-contest">
     <div class="contest-layout">
       <div class="contest-sidebar">
@@ -149,6 +99,7 @@
           </div>
         </div>
 
+        <!-- Vista previa cubo 2D (cubing.js) -->
         <div id="cube-preview-wrap" style="display:none;" class="cube-preview-wrap">
           <div class="cube-preview-label">Estado del cubo tras el scramble</div>
           <div id="cube-preview" class="cube-preview-container"></div>
@@ -168,6 +119,10 @@
           <button class="btn btn-outline" id="btn-reveal" onclick="Timer.revealScramble()">
             👁 Ver Scramble
           </button>
+          <button class="btn btn-primary" id="btn-start-inspection"
+                  style="display:none;" onclick="Timer.startInspection()">
+            ⏱ Iniciar Inspección
+          </button>
         </div>
 
         <div class="submit-section" id="submit-section">
@@ -180,16 +135,11 @@
     </div>
   </div>
 
-  <!-- ══ RESULTADOS ════════════════════════════════════ -->
+  <!-- ══ VISTA: RESULTADOS ════════════════════════════ -->
   <div class="view" id="view-results">
     <div class="results-page">
       <div class="panel-header">
-        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
-          <div class="panel-title">📊 Tabla de Resultados</div>
-          <span class="live-badge" id="live-indicator" style="display:none;">
-            <span class="live-dot"></span> En vivo
-          </span>
-        </div>
+        <div class="panel-title">📊 Tabla de Resultados</div>
         <div id="result-cat-tabs" class="cat-tabs-row"></div>
       </div>
       <div class="results-wrap">
@@ -203,7 +153,7 @@
           </thead>
           <tbody id="results-tbody"></tbody>
         </table>
-        <div class="no-results" id="no-results">Aún no hay resultados.</div>
+        <div class="no-results" id="no-results">Aún no hay resultados en esta categoría.</div>
       </div>
       <div class="table-actions">
         <button class="btn btn-outline btn-small" onclick="Results.exportCSV()">⬇ Exportar CSV</button>
@@ -212,33 +162,26 @@
     </div>
   </div>
 
-  <!-- ══ PANEL ORGANIZADOR ═════════════════════════════ -->
+  <!-- ══ VISTA: PANEL ORGANIZADOR ════════════════════ -->
   <div class="view" id="view-organizer">
-
-    <!-- Login con email + contraseña (Firebase Auth) -->
     <div id="org-login" class="form-container">
       <div class="form-title">Panel Organizador</div>
       <div class="form-subtitle">// acceso restringido</div>
       <div class="field">
-        <label>Correo del organizador</label>
-        <input type="email" id="org-email" placeholder="organizador@correo.com" />
-      </div>
-      <div class="field">
         <label>Contraseña</label>
-        <input type="password" id="org-pass" placeholder="••••••••" />
+        <input type="password" id="org-pass" placeholder="••••••••"
+               onkeydown="if(event.key==='Enter') Organizer.login()" />
       </div>
-      <div class="modal-error" id="org-login-error" style="margin-bottom:.5rem;"></div>
       <div class="form-actions">
         <button class="btn btn-primary" onclick="Organizer.login()">Ingresar</button>
         <button class="btn btn-outline" onclick="UI.showView('view-landing')">Volver</button>
       </div>
     </div>
 
-    <!-- Panel tras autenticación -->
     <div id="org-panel" style="display:none;" class="org-panel-wrap">
       <div class="panel-header">
         <div class="panel-title">⚙ Panel Organizador</div>
-        <div style="display:flex;gap:.8rem;">
+        <div style="display:flex;gap:0.8rem;">
           <button class="btn btn-outline btn-small" onclick="UI.showResults()">Ver Resultados</button>
           <button class="btn btn-danger btn-small" onclick="Organizer.logout()">Cerrar Sesión</button>
         </div>
@@ -249,14 +192,11 @@
         <div class="two-col-grid">
           <div class="field" style="margin:0;">
             <label>Nombre del Contest</label>
-            <input type="text" id="contest-name" placeholder="Ej: SV Online Contest #1" />
+            <input type="text" id="contest-name" value="SV Online Contest #1" />
           </div>
           <div class="field" style="margin:0;">
-            <label>Fecha y hora límite</label>
+            <label>Fecha límite</label>
             <input type="datetime-local" id="contest-deadline" />
-            <small style="color:var(--muted);font-family:'Space Mono',monospace;font-size:.65rem;display:block;margin-top:.3rem;">
-              Hora según tu zona horaria local
-            </small>
           </div>
         </div>
       </div>
@@ -290,10 +230,9 @@
       </div>
     </div>
   </div>
+</div>
 
-</div><!-- /app -->
-
-<!-- ══ MODALES ═══════════════════════════════════════════ -->
+<!-- ══ MODALES ═══════════════════════════════════════ -->
 <div class="modal-overlay" id="modal-abandon">
   <div class="modal">
     <h2>¿Abandonar?</h2>
@@ -334,48 +273,15 @@
   </div>
 </div>
 
-<!-- Modal: login por email para ver resultados -->
-<div class="modal-overlay" id="modal-email-login">
-  <div class="modal">
-    <h2>Ver mis resultados</h2>
-    <p>Ingresá el correo que usaste al registrarte.</p>
-    <div class="field">
-      <label class="modal-label">Correo Electrónico</label>
-      <input type="email" id="email-login-input" placeholder="tu@correo.com"
-             style="width:100%;background:var(--surface);border:1px solid var(--border);
-                    color:var(--text);padding:.85rem 1rem;font-family:'Syne',sans-serif;
-                    font-size:.95rem;border-radius:var(--radius);outline:none;" />
-      <div class="modal-error" id="email-login-error"></div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-primary" onclick="UI.submitEmailLogin()">Ver resultados →</button>
-      <button class="btn btn-outline" onclick="UI.closeModal('modal-email-login')">Cancelar</button>
-    </div>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
 
-<!--
-  ORDEN DE CARGA DE SCRIPTS:
-  1. firebase.js  → inicializa Firebase y expone window.db, window.auth, window.FB
-  2. storage.js   → capa de Firestore (usa FB/db)
-  3. config.js    → CATEGORIES + AppState vacío
-  4. timer.js     → lógica del cronómetro
-  5. results.js   → tabla de resultados
-  6. organizer.js → panel del organizador (usa Firebase Auth)
-  7. registration.js
-  8. ui.js
-  9. main.js      → carga datos async y arranca la app
--->
-<script type="module" src="js/firebase.js"></script>
-<script defer src="js/storage.js"></script>
-<script defer src="js/config.js"></script>
-<script defer src="js/timer.js"></script>
-<script defer src="js/results.js"></script>
-<script defer src="js/organizer.js"></script>
-<script defer src="js/registration.js"></script>
-<script defer src="js/ui.js"></script>
-<script defer src="js/main.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/config.js"></script>
+<script src="js/timer.js"></script>
+<script src="js/results.js"></script>
+<script src="js/organizer.js"></script>
+<script src="js/registration.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
 </body>
 </html>

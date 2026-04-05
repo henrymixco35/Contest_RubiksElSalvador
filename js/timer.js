@@ -72,9 +72,11 @@ const Timer = (() => {
     _updateScrambleDisplay();
 
     document.getElementById('submit-section').classList.remove('visible');
-    document.getElementById('scramble-display').style.display   = '';
-    document.getElementById('next-scramble-wrap').style.display = '';
-    document.getElementById('timer-controls').style.display     = 'none';
+    document.getElementById('scramble-display').style.display        = '';
+    document.getElementById('next-scramble-wrap').style.display      = '';
+    document.getElementById('timer-controls').style.display          = 'none';
+    document.getElementById('btn-reveal').style.display              = '';
+    document.getElementById('btn-start-inspection').style.display    = 'none';
   }
 
   // ── Handlers principales (llamados desde main.js) ────
@@ -102,11 +104,22 @@ const Timer = (() => {
   // Compatibilidad con onclick en botones del HTML
   function handleAction() {}
 
-  // ── Revelar scramble → arranca inspección ────────────
+  // ── Revelar scramble (solo muestra, NO arranca inspección) ──
 
   function revealScramble() {
     AppState.scrambleRevealed = true;
     _updateScrambleDisplay();
+    // Mostrar botón de iniciar inspección, ocultar el de ver scramble
+    document.getElementById('btn-reveal').style.display       = 'none';
+    document.getElementById('btn-start-inspection').style.display = '';
+    document.getElementById('timer-hint').textContent =
+      'Revisá la mezcla y presioná "Iniciar Inspección" cuando estés listo';
+  }
+
+  // ── Iniciar inspección manualmente ───────────────────
+
+  function startInspection() {
+    document.getElementById('btn-start-inspection').style.display = 'none';
     _startInspection();
   }
 
@@ -178,8 +191,10 @@ const Timer = (() => {
         } else {
           _resetDisplay();
           _updateScrambleDisplay();
-          document.getElementById('scramble-display').style.display   = '';
-          document.getElementById('next-scramble-wrap').style.display = '';
+          document.getElementById('scramble-display').style.display        = '';
+          document.getElementById('next-scramble-wrap').style.display      = '';
+          document.getElementById('btn-reveal').style.display              = '';
+          document.getElementById('btn-start-inspection').style.display    = 'none';
         }
         return;
       }
@@ -307,9 +322,11 @@ const Timer = (() => {
 
     _resetDisplay();
     _updateScrambleDisplay();
-    document.getElementById('timer-controls').style.display     = 'none';
-    document.getElementById('scramble-display').style.display   = '';
-    document.getElementById('next-scramble-wrap').style.display = '';
+    document.getElementById('timer-controls').style.display          = 'none';
+    document.getElementById('scramble-display').style.display        = '';
+    document.getElementById('next-scramble-wrap').style.display      = '';
+    document.getElementById('btn-reveal').style.display              = '';
+    document.getElementById('btn-start-inspection').style.display    = 'none';
   }
 
   // ── Scramble display + cubo 2D ───────────────────────
@@ -490,6 +507,7 @@ const Timer = (() => {
     handleRelease,
     handleAction,
     revealScramble,
+    startInspection,
     togglePenalty,
     abandon,
     getBestDisplay,
