@@ -1,0 +1,94 @@
+// firestore.rules
+// ──────────────────────────────────────────────────────────────────
+// Reglas de seguridad de Firestore.
+// Se despliegan desde Firebase Console o con Firebase CLI:
+//   firebase deploy --only firestore:rules
+//
+// IMPORTANTE: Estas reglas son la capa de seguridad REAL del proyecto.
+// Aunque alguien modifique el JavaScript en el navegador, Firestore
+// rechaza las escrituras que no cumplan estas reglas.
+// ──────────────────────────────────────────────────────────────────
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Colección: contest ─────────────────────────────────────
+    // Solo el organizador autenticado puede escribir.
+    // Todos pueden leer (para mostrar scrambles y nombre del contest).
+    //
+    // ⚠️  Reemplazá "TU_UID_AQUI" con el UID real de tu usuario
+    //     organizador. Lo encontrás en Firebase Console →
+    //     Authentication → Users → columna "User UID".
+
+    match /contest/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == "TU_UID_AQUI";
+    }
+
+    // ── Colección: results ─────────────────────────────────────
+    // Cualquiera puede leer (tabla pública).
+    // Cualquiera puede crear UN resultado, siempre que:
+    //   - No se repita el mismo email + categoría (una sola submission).
+    //   - Los campos requeridos estén presentes y sean del tipo correcto.
+    //   - No se puede actualizar ni borrar (immutable, solo el org borra en reset).
+    //
+    // NOTA: La unicidad email+categoría no se puede validar 100%
+    // en reglas de Firestore (sin consultas en reglas de escritura),
+    // pero la validación en el cliente + el modelo de datos la refuerzan.
+    // Para producción crítica se puede agregar una Cloud Function.
+
+    match /results/{resultId} {
+      allow read: if true;
+
+      allow create: if
+        // Campos obligatorios presentes
+        request.resource.data.keys().hasAll(['name', 'email', 'category', 'solves', 'ao5', 'ao5ms', 'timestamp'])
+        // Tipos correctos
+        && request.resource.data.name     is string
+        && request.resource.data.email    is string
+        && request.resource.data.category is string
+        && request.resource.data.solves   is list
+        // El email debe tener formato mínimo
+        && request.resource.data.email.matches('.*@.*')
+        // Máximo 5 solves
+        && request.resource.data.solves.size() <= 5;
+
+      // Solo el organizador puede borrar (para el reset)
+      allow delete: if request.auth != null
+                    && request.auth.uid == "TU_UID_AQUI";
+
+      // Nadie puede modificar un resultado ya enviado
+      allow update: if false;
+    }
+
+    // ── Colección: participants ────────────────────────────────
+    // Cualquiera puede registrarse (crear).
+    // Solo el organizador puede leer la lista completa (tiene emails).
+    // Nadie puede modificar ni borrar (solo el org en reset).
+
+    match /participants/{participantId} {
+      allow read:   if request.auth != null
+                    && request.auth.uid == "TU_UID_AQUI";
+
+      allow create: if
+        request.resource.data.keys().hasAll(['name', 'email', 'category', 'timestamp'])
+        && request.resource.data.name     is string
+        && request.resource.data.email    is string
+        && request.resource.data.category is string
+        && request.resource.data.email.matches('.*@.*');
+
+      allow delete: if request.auth != null
+                    && request.auth.uid == "TU_UID_AQUI";
+
+      allow update: if false;
+    }
+
+    // ── Cualquier otra colección → denegado por defecto ────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

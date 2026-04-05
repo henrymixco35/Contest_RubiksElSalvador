@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CubitOS SV — Contest Online</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <script src="https://cdn.cubing.net/v0/js/cubing/twisty" type="module"></script>
+  <style>
+    .live-badge {
+      display: inline-flex; align-items: center; gap: .4rem;
+      font-family: 'Space Mono', monospace; font-size: .65rem;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: var(--accent2); border: 1px solid var(--accent2);
+      border-radius: 2px; padding: .25rem .6rem;
+    }
+    .live-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--accent2); animation: livePulse 1s ease-in-out infinite;
+    }
+    @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    .modal-label {
+      display:block; font-family:'Space Mono',monospace; font-size:.7rem;
+      letter-spacing:.1em; text-transform:uppercase; color:var(--muted);
+      margin-bottom:.5rem;
+    }
+    .modal-error {
+      font-family:'Space Mono',monospace; font-size:.75rem;
+      color:var(--accent2); margin-top:.5rem; min-height:1.1em;
+    }
+    .landing-secondary {
+      margin-top:1rem; font-family:'Space Mono',monospace; font-size:.78rem;
+      color:var(--muted); background:none; border:none; cursor:pointer;
+      text-decoration:underline; text-underline-offset:3px;
+      transition:color .2s; padding:0;
+    }
+    .landing-secondary:hover { color:var(--accent); }
+
+    /* Estilos propios del timer */
+    .timer-display.inspection      { color: #fff; }
+    .timer-display.inspection.warn { color: var(--accent3); }
+    .timer-display.inspection.plus2-warn { color: var(--accent2); }
+    .timer-display.inspection.hold-yellow { color: var(--accent3); }
+    .timer-display.inspection.hold-green  { color: var(--accent);  }
+    .cube-preview-wrap        { width:100%; max-width:360px; text-align:center; }
+    .cube-preview-label       { font-family:'Space Mono',monospace; font-size:.62rem;
+                                letter-spacing:.15em; text-transform:uppercase;
+                                color:var(--muted); margin-bottom:.5rem; }
+    .cube-preview-container   { width:100%; background:var(--bg);
+                                border:1px solid var(--border); border-radius:8px;
+                                overflow:hidden; }
+    .own-badge {
+      display:inline-block; font-size:.65rem; font-family:'Space Mono',monospace;
+      background:rgba(0,229,160,.15); color:var(--accent); border:1px solid var(--accent);
+      border-radius:2px; padding:0 .4rem; margin-left:.4rem; vertical-align:middle;
+    }
+    .own-row td { background: rgba(0,229,160,.04); }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div class="glow-orb"></div>
+
+  <header>
+    <div class="logo">Comunidad Rubik's<span> El Salvador</span></div>
+    <div id="header-actions">
+      <span class="header-badge" id="contest-badge" style="display:none;">● CONTEST ACTIVO</span>
+      <button class="btn btn-outline btn-small" onclick="UI.showOrganizer()">Organizador</button>
+    </div>
+  </header>
+
+  <!-- ══ LANDING ═══════════════════════════════════════ -->
+  <div class="view active" id="view-landing">
+    <div class="landing-eyebrow">🇸🇻 Comunidad Rubik El Salvador</div>
+    <h1 class="landing-title">
+      Contest<br><span class="hl">Online</span><br><span class="hl2">Platform</span>
+    </h1>
+    <p class="landing-sub">
+      Competí desde casa. Tus tiempos se registran automáticamente
+      y la tabla de resultados se genera al instante.
+    </p>
+    <button class="btn btn-primary" onclick="UI.showRegistration()">
+      ▶ Participar en el Contest
+    </button>
+    <button class="landing-secondary" onclick="UI.showEmailLogin()">
+      Ya participé — ver mis resultados
+    </button>
+  </div>
+
+  <!-- ══ REGISTRO ══════════════════════════════════════ -->
+  <div class="view" id="view-register">
+    <div class="form-container">
+      <div class="form-title">Registro</div>
+      <div class="form-subtitle">// ingresá tus datos para participar</div>
+      <div class="field">
+        <label>Nombre Completo</label>
+        <input type="text" id="reg-name" placeholder="Ej: Carlos Martínez" />
+      </div>
+      <div class="field">
+        <label>Correo Electrónico</label>
+        <input type="email" id="reg-email" placeholder="tu@correo.com" />
+      </div>
+      <div class="field">
+        <label>Categoría a Competir</label>
+        <select id="reg-category">
+          <option value="">— Seleccioná una categoría —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Sugerencias para próximos contests (opcional)</label>
+        <textarea id="reg-suggestions" placeholder="¿Qué categorías o formatos te gustaría ver?"></textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="Registration.submit()">Continuar →</button>
+        <button class="btn btn-outline" onclick="UI.showView('view-landing')">Volver</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ TIMER / CONTEST ═══════════════════════════════ -->
+  <div class="view" id="view-contest">
+    <div class="contest-layout">
+      <div class="contest-sidebar">
+        <div class="sidebar-label">Competidor</div>
+        <div class="sidebar-info" id="sb-name">—</div>
+        <div class="sidebar-label">Categoría</div>
+        <div class="sidebar-info" id="sb-cat">—</div>
+        <div class="sidebar-label">Solves</div>
+        <div class="solve-list" id="solve-list"></div>
+        <div class="ao-display">
+          <div class="ao-row"><span>Mejor</span><span id="ao-best">—</span></div>
+          <div class="ao-row"><span>Ao5</span><span id="ao-ao5">—</span></div>
+        </div>
+        <div class="sidebar-bottom">
+          <button class="btn btn-danger btn-small" onclick="UI.confirmAbandon()">✕ Abandonar</button>
+        </div>
+      </div>
+
+      <div class="contest-main" id="contest-main">
+        <div class="scramble-display" id="scramble-display">
+          <div class="scramble-header">
+            SCRAMBLE — SOLVE <span id="current-solve-num">1</span> / 5
+          </div>
+          <div class="scramble-text" id="scramble-text">
+            <span class="scramble-locked">Presioná "Ver Scramble" para comenzar</span>
+          </div>
+        </div>
+
+        <div id="cube-preview-wrap" style="display:none;" class="cube-preview-wrap">
+          <div class="cube-preview-label">Estado del cubo tras el scramble</div>
+          <div id="cube-preview" class="cube-preview-container"></div>
+        </div>
+
+        <div class="timer-area">
+          <div class="solve-badge" id="solve-badge">SOLVE 1</div>
+          <div class="timer-display" id="timer-display">0:00.00</div>
+          <div class="timer-hint" id="timer-hint">Presioná "Ver Scramble" para continuar</div>
+          <div class="timer-controls" id="timer-controls" style="display:none;">
+            <button class="btn-penalize" id="btn-plus2" onclick="Timer.togglePenalty('plus2')">+2</button>
+            <button class="btn-penalize" id="btn-dnf"   onclick="Timer.togglePenalty('dnf')">DNF</button>
+          </div>
+        </div>
+
+        <div id="next-scramble-wrap">
+          <button class="btn btn-outline" id="btn-reveal" onclick="Timer.revealScramble()">
+            👁 Ver Scramble
+          </button>
+        </div>
+
+        <div class="submit-section" id="submit-section">
+          <div class="final-summary" id="final-summary"></div>
+          <button class="btn btn-primary" onclick="Results.submit()" style="width:100%;">
+            ✓ Enviar Resultados
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ RESULTADOS ════════════════════════════════════ -->
+  <div class="view" id="view-results">
+    <div class="results-page">
+      <div class="panel-header">
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+          <div class="panel-title">📊 Tabla de Resultados</div>
+          <span class="live-badge" id="live-indicator" style="display:none;">
+            <span class="live-dot"></span> En vivo
+          </span>
+        </div>
+        <div id="result-cat-tabs" class="cat-tabs-row"></div>
+      </div>
+      <div class="results-wrap">
+        <table id="results-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Nombre</th>
+              <th>S1</th><th>S2</th><th>S3</th><th>S4</th><th>S5</th>
+              <th>Mejor</th><th>Ao5</th>
+            </tr>
+          </thead>
+          <tbody id="results-tbody"></tbody>
+        </table>
+        <div class="no-results" id="no-results">Aún no hay resultados.</div>
+      </div>
+      <div class="table-actions">
+        <button class="btn btn-outline btn-small" onclick="Results.exportCSV()">⬇ Exportar CSV</button>
+        <button class="btn btn-outline btn-small" onclick="UI.showView('view-landing')">← Inicio</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ PANEL ORGANIZADOR ═════════════════════════════ -->
+  <div class="view" id="view-organizer">
+
+    <!-- Login con email + contraseña (Firebase Auth) -->
+    <div id="org-login" class="form-container">
+      <div class="form-title">Panel Organizador</div>
+      <div class="form-subtitle">// acceso restringido</div>
+      <div class="field">
+        <label>Correo del organizador</label>
+        <input type="email" id="org-email" placeholder="organizador@correo.com" />
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input type="password" id="org-pass" placeholder="••••••••" />
+      </div>
+      <div class="modal-error" id="org-login-error" style="margin-bottom:.5rem;"></div>
+      <div class="form-actions">
+        <button class="btn btn-primary" onclick="Organizer.login()">Ingresar</button>
+        <button class="btn btn-outline" onclick="UI.showView('view-landing')">Volver</button>
+      </div>
+    </div>
+
+    <!-- Panel tras autenticación -->
+    <div id="org-panel" style="display:none;" class="org-panel-wrap">
+      <div class="panel-header">
+        <div class="panel-title">⚙ Panel Organizador</div>
+        <div style="display:flex;gap:.8rem;">
+          <button class="btn btn-outline btn-small" onclick="UI.showResults()">Ver Resultados</button>
+          <button class="btn btn-danger btn-small" onclick="Organizer.logout()">Cerrar Sesión</button>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <h3>📋 Información del Contest</h3>
+        <div class="two-col-grid">
+          <div class="field" style="margin:0;">
+            <label>Nombre del Contest</label>
+            <input type="text" id="contest-name" placeholder="Ej: SV Online Contest #1" />
+          </div>
+          <div class="field" style="margin:0;">
+            <label>Fecha y hora límite</label>
+            <input type="datetime-local" id="contest-deadline" />
+            <small style="color:var(--muted);font-family:'Space Mono',monospace;font-size:.65rem;display:block;margin-top:.3rem;">
+              Hora según tu zona horaria local
+            </small>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-card">
+        <h3>🔀 Categorías y Scrambles</h3>
+        <p class="section-hint">Activá las categorías con el checkbox y pegá los 5 scrambles.</p>
+        <div id="org-cats"></div>
+        <button class="btn btn-primary btn-small" style="margin-top:1rem;" onclick="Organizer.saveContest()">
+          💾 Guardar y Activar Contest
+        </button>
+      </div>
+
+      <div class="section-card">
+        <h3>👥 Participantes Registrados</h3>
+        <div class="results-wrap">
+          <table>
+            <thead>
+              <tr><th>Nombre</th><th>Email</th><th>Categoría</th><th>Sugerencias</th><th>Estado</th></tr>
+            </thead>
+            <tbody id="participants-tbody"></tbody>
+          </table>
+          <div class="no-results" id="no-participants">Sin participantes registrados aún.</div>
+        </div>
+      </div>
+
+      <div class="section-card danger-zone">
+        <h3>⚠ Zona de Peligro</h3>
+        <p class="section-hint">Borra todos los resultados y participantes del contest actual.</p>
+        <button class="btn btn-danger btn-small" onclick="Organizer.confirmReset()">🗑 Resetear Contest</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- ══ MODALES ═══════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-abandon">
+  <div class="modal">
+    <h2>¿Abandonar?</h2>
+    <p>Perderás todos tus tiempos de esta sesión.</p>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="Timer.abandon()">Sí, abandonar</button>
+      <button class="btn btn-outline" onclick="UI.closeModal('modal-abandon')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-reset">
+  <div class="modal">
+    <h2>⚠ Resetear Contest</h2>
+    <p>Se borrarán TODOS los resultados y participantes. Escribí RESET para confirmar.</p>
+    <div class="field"><input type="text" id="reset-confirm" placeholder="RESET" /></div>
+    <div class="modal-actions">
+      <button class="btn btn-danger" onclick="Organizer.doReset()">Confirmar Reset</button>
+      <button class="btn btn-outline" onclick="UI.closeModal('modal-reset')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-success">
+  <div class="modal" style="text-align:center;">
+    <div style="font-size:3rem;margin-bottom:1rem;">🏆</div>
+    <h2>¡Resultados Enviados!</h2>
+    <p id="success-msg">Tus tiempos fueron registrados correctamente.</p>
+    <div class="modal-actions" style="justify-content:center;flex-direction:column;gap:.75rem;">
+      <button class="btn btn-primary" onclick="UI.showResults(); UI.closeModal('modal-success')">
+        📊 Ver Tabla de Resultados
+      </button>
+      <button class="btn btn-outline btn-small"
+              onclick="UI.closeModal('modal-success'); UI.showView('view-landing')">
+        Volver al inicio
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: login por email para ver resultados -->
+<div class="modal-overlay" id="modal-email-login">
+  <div class="modal">
+    <h2>Ver mis resultados</h2>
+    <p>Ingresá el correo que usaste al registrarte.</p>
+    <div class="field">
+      <label class="modal-label">Correo Electrónico</label>
+      <input type="email" id="email-login-input" placeholder="tu@correo.com"
+             style="width:100%;background:var(--surface);border:1px solid var(--border);
+                    color:var(--text);padding:.85rem 1rem;font-family:'Syne',sans-serif;
+                    font-size:.95rem;border-radius:var(--radius);outline:none;" />
+      <div class="modal-error" id="email-login-error"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="UI.submitEmailLogin()">Ver resultados →</button>
+      <button class="btn btn-outline" onclick="UI.closeModal('modal-email-login')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!--
+  ORDEN DE CARGA DE SCRIPTS:
+  1. firebase.js  → inicializa Firebase y expone window.db, window.auth, window.FB
+  2. storage.js   → capa de Firestore (usa FB/db)
+  3. config.js    → CATEGORIES + AppState vacío
+  4. timer.js     → lógica del cronómetro
+  5. results.js   → tabla de resultados
+  6. organizer.js → panel del organizador (usa Firebase Auth)
+  7. registration.js
+  8. ui.js
+  9. main.js      → carga datos async y arranca la app
+-->
+<script type="module" src="js/firebase.js"></script>
+<script defer src="js/storage.js"></script>
+<script defer src="js/config.js"></script>
+<script defer src="js/timer.js"></script>
+<script defer src="js/results.js"></script>
+<script defer src="js/organizer.js"></script>
+<script defer src="js/registration.js"></script>
+<script defer src="js/ui.js"></script>
+<script defer src="js/main.js"></script>
+</body>
+</html>
