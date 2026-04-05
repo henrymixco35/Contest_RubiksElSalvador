@@ -1,22 +1,28 @@
 /**
  * ui.js
- * ──────────────────────────────────────────────────────
- * Navegación, modales, toast y login por email para
- * competidores que ya participaron.
  */
 
 const UI = (() => {
 
   let toastTimer = null;
 
-  /* ── Navegación ──────────────────────────────────────── */
-
   function showView(id) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById(id).classList.add('active');
     if (id !== 'view-results') {
-      document.getElementById('live-indicator').style.display = 'none';
+      const li = document.getElementById('live-indicator');
+      if (li) li.style.display = 'none';
     }
+  }
+
+  /* ── Sidebar móvil ───────────────────────────────────── */
+
+  function toggleSidebar() {
+    const toggle = document.getElementById('sidebar-toggle');
+    const inner  = document.getElementById('sidebar-inner');
+    if (!toggle || !inner) return;
+    const isOpen = inner.classList.toggle('open');
+    toggle.classList.toggle('open', isOpen);
   }
 
   /* ── Landing ─────────────────────────────────────────── */
@@ -92,14 +98,13 @@ const UI = (() => {
 
     Results.render(visibleCats);
     showView('view-results');
-    // Mostrar badge de "en vivo" porque ya hay suscripción en main.js
-    document.getElementById('live-indicator').style.display = '';
+    const li = document.getElementById('live-indicator');
+    if (li) li.style.display = '';
   }
 
-  /* ── Panel organizador ───────────────────────────────── */
+  /* ── Organizador ─────────────────────────────────────── */
 
   function showOrganizer() {
-    // Si ya está autenticado, mostrar panel directo
     if (AppState.isOrganizer) {
       showView('view-organizer');
       Organizer.showPanel();
@@ -128,7 +133,7 @@ const UI = (() => {
     toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
   }
 
-  /* ── Badge de estado ─────────────────────────────────── */
+  /* ── Badge ───────────────────────────────────────────── */
 
   function updateContestBadge() {
     const hasCats  = Object.keys(AppState.contest.categories || {}).length > 0;
@@ -166,7 +171,8 @@ const UI = (() => {
   }
 
   return {
-    showView, showRegistration,
+    showView, toggleSidebar,
+    showRegistration,
     showEmailLogin, submitEmailLogin,
     showResults, showOrganizer,
     closeModal, confirmAbandon,
