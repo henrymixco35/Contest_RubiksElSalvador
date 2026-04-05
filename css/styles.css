@@ -131,6 +131,9 @@ header {
 .view { display: none; flex: 1; }
 .view.active { display: flex; flex-direction: column; }
 
+/* Vista de contest crece según su contenido para permitir scroll en móvil */
+#view-contest.active { flex: unset; }
+
 /* ── Landing ─────────────────────────────────────────── */
 #view-landing {
   align-items: center;
@@ -319,7 +322,7 @@ header {
 .form-actions { display: flex; gap: .75rem; margin-top: 1.5rem; flex-wrap: wrap; }
 
 /* ── Contest layout ──────────────────────────────────── */
-#view-contest { padding: 0; }
+#view-contest { padding: 0; flex: unset; }
 
 .contest-layout {
   display: grid;
@@ -715,12 +718,12 @@ tbody tr:hover td { background: var(--surface2); }
 @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.25} }
 
 /* ── Panel Organizador ───────────────────────────────── */
-#view-organizer { padding: 2rem 1.5rem; }
+#view-organizer { padding: 2rem 1.5rem 4rem; overflow-y: auto; }
 
 .org-panel-wrap {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 2rem;
   max-width: 800px;
   width: 100%;
   margin: 0 auto;
