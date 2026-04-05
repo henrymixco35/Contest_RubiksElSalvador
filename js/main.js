@@ -3,6 +3,10 @@
  * ──────────────────────────────────────────────────────
  * Fix clave para móvil: diferenciar scroll de tap intencional.
  * Un toque que se mueve más de 10px se considera scroll → ignorar.
+ *
+ * FIXES:
+ *  - Eliminado el segundo listener de touchend que cancelaba el hold-to-start.
+ *  - Ahora touchend maneja tanto tap simple como release de hold correctamente.
  */
 
 (async function init() {
@@ -64,15 +68,21 @@
     Timer.handleRelease();
   });
 
-  // ── Touch en la zona del timer — con detección de scroll ──
+  // ── Touch en la zona del timer ───────────────────────
   //
-  // Problema en móvil: el usuario hace scroll para ver el timer
-  // y eso dispara touchstart → handlePress() → inicia inspección.
-  // Solución: registrar posición inicial y comparar en touchend.
-  // Si se movió más de SCROLL_THRESHOLD px → era scroll, ignorar.
+  // Lógica unificada en UN SOLO conjunto de listeners:
+  //
+  //  touchstart  → registrar posición inicial
+  //  touchmove   → detectar si fue scroll
+  //  touchend    → si no fue scroll:
+  //                  · estado running/stopped → handlePress()
+  //                  · estado inspection (hold activo) → handleRelease()
+  //                  · estado idle/inspection (sin hold) → handlePress()
+  //  touchcancel → limpiar estado
 
-  const contestMain       = document.getElementById('contest-main');
-  const SCROLL_THRESHOLD  = 10; // px de movimiento para considerar scroll
+  const contestMain      = document.getElementById('contest-main');
+  const SCROLL_THRESHOLD = 10; // px de movimiento para considerar scroll
+
   let touchStartY = 0;
   let touchStartX = 0;
   let touchMoved  = false;
@@ -82,7 +92,12 @@
     touchStartY = e.touches[0].clientY;
     touchStartX = e.touches[0].clientX;
     touchMoved  = false;
-  }, { passive: true }); // passive: no bloqueamos scroll
+
+    // Iniciar hold si estamos en inspección
+    if (AppState.timerState === 'inspection') {
+      Timer.handlePress();
+    }
+  }, { passive: true });
 
   contestMain.addEventListener('touchmove', (e) => {
     const dy = Math.abs(e.touches[0].clientY - touchStartY);
@@ -94,32 +109,33 @@
 
   contestMain.addEventListener('touchend', (e) => {
     if (e.target.closest('button, a, input, select, textarea, .solve-item')) return;
-    if (touchMoved) return; // fue scroll → ignorar
+    if (touchMoved) {
+      // Era scroll; si había hold iniciado, cancelarlo
+      if (AppState.timerState === 'inspection') {
+        Timer.handleRelease();
+      }
+      return;
+    }
 
-    // Toque real → manejar press/release
     e.preventDefault();
-    Timer.handlePress();
+
+    const state = AppState.timerState;
+
+    if (state === 'inspection') {
+      // Soltar durante inspección → release del hold
+      Timer.handleRelease();
+    } else {
+      // idle, running, stopped → press normal
+      Timer.handlePress();
+    }
   }, { passive: false });
 
-  // Para el hold-to-start en touch necesitamos un touchcancel también
   contestMain.addEventListener('touchcancel', () => {
-    touchMoved = true; // considerar cancelado como movimiento
-    Timer.handleRelease();
-  }, { passive: true });
-
-  // El handleRelease en touch se simuló en touchend para tap simple.
-  // Para hold-to-start: el usuario mantiene presionado y suelta.
-  // Necesitamos rastrear si el toque sigue siendo hold.
-  // Implementamos: si el estado es 'inspection' al soltar → release.
-  const origTouchEnd = contestMain.ontouchend;
-  contestMain.addEventListener('touchend', (e) => {
-    if (e.target.closest('button, a, input, select, textarea, .solve-item')) return;
-    if (touchMoved) return;
-    // Si estamos en inspection con hold activo → release
+    touchMoved = true;
     if (AppState.timerState === 'inspection') {
       Timer.handleRelease();
     }
-  }, { passive: false });
+  }, { passive: true });
 
   // ── Click (fallback desktop) ─────────────────────────
 

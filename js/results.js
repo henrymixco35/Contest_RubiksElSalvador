@@ -3,6 +3,9 @@
  * Tabla de resultados pública pero filtrada:
  *  - Organizador → ve todas las categorías.
  *  - Competidor  → solo ve las categorías en que ya participó.
+ *
+ * FIX: submit() ahora usa Storage.saveResult() (Firestore) en lugar
+ *      del incorrecto Storage.save() que era de localStorage.
  */
 
 const Results = (() => {
@@ -13,7 +16,7 @@ const Results = (() => {
 
   // ── Enviar resultados ────────────────────────────────
 
-  function submit() {
+  async function submit() {
     const result = {
       name:      AppState.contestant.name,
       email:     AppState.contestant.email,
@@ -25,13 +28,22 @@ const Results = (() => {
       timestamp: new Date().toISOString(),
     };
 
+    try {
+      // Guardar en Firestore (fix: antes llamaba Storage.save que no existe)
+      await Storage.saveResult(result);
+    } catch (err) {
+      console.error('[Results] saveResult:', err);
+      UI.toast('⚠ Error al guardar resultados. Intentá de nuevo.');
+      return;
+    }
+
+    // Actualizar estado local (el onSnapshot también lo hará, pero esto es inmediato)
     AppState.results.push(result);
-    Storage.save('results', AppState.results);
     AppState.lastOwnResult = result;
 
     const catName = AppState.contest.categories[AppState.contestant.category]?.name || '';
     document.getElementById('success-msg').textContent =
-      `${result.name} — ${catName} — Ao5: ${result.ao5}`;
+      `${result.name} — ${catName} — ${Timer.getStatLabel()}: ${result.ao5}`;
 
     document.getElementById('modal-success').classList.add('open');
   }
@@ -92,7 +104,6 @@ const Results = (() => {
     const statLabel   = mo3 ? 'Mo3' : 'Ao5';
     const thead = document.querySelector('#results-table thead tr');
     if (thead) {
-      // Reconstruir cabecera dinámica
       thead.innerHTML = `<th>#</th><th>Nombre</th>`;
       for (let i = 1; i <= totalSolves; i++) {
         thead.innerHTML += `<th>S${i}</th>`;
