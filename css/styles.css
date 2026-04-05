@@ -589,6 +589,7 @@ header {
   justify-content: space-between;
   flex-wrap: wrap;
   gap: .8rem;
+  margin-bottom: .5rem;
 }
 
 .panel-title {
@@ -714,12 +715,12 @@ tbody tr:hover td { background: var(--surface2); }
 @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.25} }
 
 /* ── Panel Organizador ───────────────────────────────── */
-#view-organizer { padding: 1.5rem; }
+#view-organizer { padding: 2rem 1.5rem; }
 
 .org-panel-wrap {
   display: flex;
   flex-direction: column;
-  gap: 1.2rem;
+  gap: 1.5rem;
   max-width: 800px;
   width: 100%;
   margin: 0 auto;
@@ -729,7 +730,7 @@ tbody tr:hover td { background: var(--surface2); }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 1.4rem;
+  padding: 1.8rem 2rem;
 }
 
 .section-card h3 {
@@ -782,7 +783,7 @@ tbody tr:hover td { background: var(--surface2); }
   cursor: pointer;
   color: var(--text);
 }
-.cat-section-body { display: none; padding: .8rem 1rem; gap: .5rem; flex-direction: column; }
+.cat-section-body { display: none; padding: 1rem 1.2rem; gap: .55rem; flex-direction: column; }
 .cat-section-body.open { display: flex; }
 .toggle-arrow { color: var(--muted); font-size: .75rem; transition: transform .2s; }
 .cat-section-body.open ~ .cat-section-header .toggle-arrow { transform: rotate(180deg); }
@@ -992,6 +993,14 @@ tbody tr:hover td { background: var(--surface2); }
 .sidebar-toggle    { display: none; }
 .mobile-abandon-btn{ display: none; }
 
+/* En desktop, sidebar-inner siempre visible como columna */
+.sidebar-inner {
+  display: flex;
+  flex-direction: column;
+  gap: .6rem;
+  flex: 1;
+}
+
 @media (max-width: 700px) {
   /* Layout vertical */
   .contest-layout {
@@ -1042,12 +1051,13 @@ tbody tr:hover td { background: var(--surface2); }
   .sidebar-toggle-arrow   { transition: transform .25s; font-size: .7rem; }
   .sidebar-toggle.open .sidebar-toggle-arrow { transform: rotate(180deg); }
 
-  /* Contenido interno: oculto por defecto */
+  /* Contenido interno: oculto por defecto en móvil */
   .sidebar-inner {
     display: none;
     padding: 1rem 1.2rem 1.5rem;
     gap: .4rem;
     flex-direction: column;
+    flex: unset;
   }
   .sidebar-inner.open { display: flex; }
 
