@@ -131,8 +131,9 @@ header {
 .view { display: none; flex: 1; }
 .view.active { display: flex; flex-direction: column; }
 
-/* Vista de contest crece según su contenido para permitir scroll en móvil */
-#view-contest.active { flex: unset; }
+/* Vistas con contenido largo: crecen más allá del viewport para permitir scroll */
+#view-contest.active,
+#view-organizer.active { flex: unset; }
 
 /* ── Landing ─────────────────────────────────────────── */
 #view-landing {

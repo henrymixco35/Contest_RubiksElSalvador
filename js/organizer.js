@@ -1,14 +1,10 @@
 /**
  * organizer.js
- * ──────────────────────────────────────────────────────
- * El organizador se autentica con Firebase Auth (email/password).
- * Todas las escrituras sensibles (contest config, reset) están
- * protegidas por las reglas de Firestore — aunque alguien manipule
- * el JS en el navegador, Firestore rechaza la escritura si no hay
- * un usuario autenticado con el UID correcto.
  */
 
 const Organizer = (() => {
+
+  const MO3_CATS = new Set(['6x6', '7x7']);
 
   // ── Login con Firebase Auth ───────────────────────────
 
@@ -29,7 +25,6 @@ const Organizer = (() => {
 
     try {
       await FB.signInWithEmailAndPassword(auth, email, pass);
-      // onAuthStateChanged en main.js maneja el resto
     } catch (err) {
       console.error('[Organizer] login error:', err.code);
       if (err.code === 'auth/invalid-credential' ||
@@ -72,8 +67,9 @@ const Organizer = (() => {
     CATEGORIES.forEach(cat => {
       const checkbox = document.getElementById('cat-toggle-' + cat.id);
       if (!checkbox || !checkbox.checked) return;
+      const total = MO3_CATS.has(cat.id) ? 3 : 5;
       const scrambles = [];
-      for (let i = 1; i <= 5; i++) {
+      for (let i = 1; i <= total; i++) {
         const input = document.getElementById(`scr-${cat.id}-${i}`);
         scrambles.push(input ? input.value.trim() : '');
       }
@@ -97,7 +93,7 @@ const Organizer = (() => {
     try {
       await Storage.saveContest(contestData);
       AppState.contest = contestData;
-      document.title = (contestData.name || 'CubitOS SV') + ' — Contest Online';
+      document.title = (contestData.name || 'Rubik SV') + ' — Contest Online';
       UI.toast('✓ Contest guardado y activado');
       UI.updateContestBadge();
     } catch (err) {
@@ -138,30 +134,36 @@ const Organizer = (() => {
     document.getElementById('contest-deadline').value = AppState.contest.deadline || '';
     _renderCategoryList();
 
-    // Cargar participantes frescos
     try {
       AppState.participants = await Storage.loadParticipants();
-    } catch (e) { /* ya logueado en Storage */ }
+    } catch (e) {}
     _renderParticipants();
   }
 
   function _renderCategoryList() {
     const container = document.getElementById('org-cats');
     container.innerHTML = '';
+
     CATEGORIES.forEach(cat => {
       const isEnabled = !!(AppState.contest.categories?.[cat.id]);
-      const scrambles = AppState.contest.categories?.[cat.id]?.scrambles || ['', '', '', '', ''];
+      const total     = MO3_CATS.has(cat.id) ? 3 : 5;
+      // Leer scrambles guardados; rellenar hasta `total` con vacíos
+      const saved     = AppState.contest.categories?.[cat.id]?.scrambles || [];
+      const scrambles = Array.from({ length: total }, (_, i) => saved[i] || '');
 
       const section = document.createElement('div');
       section.className = 'cat-section';
 
       const header = document.createElement('div');
       header.className = 'cat-section-header';
+      // Mostrar etiqueta Mo3 / Ao5 junto al nombre
+      const formatLabel = MO3_CATS.has(cat.id) ? 'Mo3' : 'Ao5';
       header.innerHTML = `
         <label class="cat-check-label">
           <input type="checkbox" id="cat-toggle-${cat.id}" ${isEnabled ? 'checked' : ''}
                  style="accent-color:var(--accent);" />
           <span>${cat.name}</span>
+          <span style="font-size:.6rem;color:var(--muted);margin-left:.3rem;">(${formatLabel} · ${total} scrambles)</span>
         </label>
         <span class="toggle-arrow">▾</span>
       `;
@@ -174,7 +176,7 @@ const Organizer = (() => {
         body.classList.toggle('open');
       });
 
-      for (let i = 1; i <= 5; i++) {
+      for (let i = 1; i <= total; i++) {
         const row = document.createElement('div');
         row.className = 'scramble-row';
         row.innerHTML = `
@@ -208,7 +210,7 @@ const Organizer = (() => {
         <td>${p.email}</td>
         <td>${catName}</td>
         <td class="suggestions-cell">${p.suggestions || '—'}</td>
-        <td style="color:${hasResult ? 'var(--accent)' : 'var(--muted)'}">
+        <td style="color:${hasResult ? 'var(--accent4)' : 'var(--muted)'}">
           ${hasResult ? '✓ Enviado' : 'Pendiente'}
         </td>
       `;
