@@ -4,7 +4,7 @@
    Paleta inspirada en: azul cobalto SV + blanco + negro profundo
    ══════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
 /* ── Variables ──────────────────────────────────────── */
 :root {
@@ -43,7 +43,7 @@
 html { scroll-behavior: smooth; }
 
 body {
-  font-family: 'Syne', sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100dvh;
@@ -154,11 +154,11 @@ header {
 }
 
 .landing-title {
-  font-family: 'Syne', sans-serif;
-  font-weight: 800;
-  font-size: clamp(2.8rem, 10vw, 5.5rem);
-  line-height: 1.05;
-  letter-spacing: -.02em;
+  font-family: 'DM Serif Display', serif;
+  font-weight: 400;
+  font-size: clamp(3rem, 11vw, 6rem);
+  line-height: 1.08;
+  letter-spacing: -.01em;
   margin-bottom: 1.5rem;
   color: var(--text);
 }
@@ -166,10 +166,11 @@ header {
 .hl2 { color: var(--accent3); }
 
 .landing-sub {
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 1rem;
   color: var(--muted2);
   max-width: 440px;
-  line-height: 1.7;
+  line-height: 1.75;
   margin-bottom: 2.5rem;
 }
 
@@ -253,9 +254,10 @@ header {
 }
 
 .form-title {
-  font-weight: 800;
-  font-size: 1.8rem;
-  letter-spacing: -.02em;
+  font-family: 'DM Serif Display', serif;
+  font-weight: 400;
+  font-size: 2rem;
+  letter-spacing: -.01em;
   margin-bottom: .4rem;
 }
 
@@ -289,7 +291,7 @@ header {
   border: 1px solid var(--border);
   color: var(--text);
   padding: .85rem 1rem;
-  font-family: 'Syne', sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: .95rem;
   border-radius: var(--radius);
   outline: none;
@@ -590,9 +592,10 @@ header {
 }
 
 .panel-title {
-  font-weight: 800;
-  font-size: 1.4rem;
-  letter-spacing: -.02em;
+  font-family: 'DM Serif Display', serif;
+  font-weight: 400;
+  font-size: 1.6rem;
+  letter-spacing: -.01em;
 }
 
 .cat-tabs-row {
@@ -730,19 +733,21 @@ tbody tr:hover td { background: var(--surface2); }
 }
 
 .section-card h3 {
-  font-size: .8rem;
-  font-family: 'Space Mono', monospace;
-  letter-spacing: .1em;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: .78rem;
+  font-weight: 600;
+  letter-spacing: .08em;
   text-transform: uppercase;
   color: var(--muted2);
   margin-bottom: .8rem;
 }
 
 .section-hint {
-  font-size: .82rem;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: .85rem;
   color: var(--muted2);
   margin-bottom: 1rem;
-  line-height: 1.6;
+  line-height: 1.65;
 }
 
 .two-col-grid {
@@ -849,15 +854,17 @@ tbody tr:hover td { background: var(--surface2); }
 }
 
 .modal h2 {
-  font-size: 1.2rem;
-  font-weight: 800;
+  font-family: 'DM Serif Display', serif;
+  font-weight: 400;
+  font-size: 1.4rem;
   margin-bottom: .6rem;
   letter-spacing: -.01em;
 }
 .modal p {
+  font-family: 'Plus Jakarta Sans', sans-serif;
   color: var(--muted2);
   font-size: .88rem;
-  line-height: 1.6;
+  line-height: 1.65;
   margin-bottom: 1.2rem;
 }
 
