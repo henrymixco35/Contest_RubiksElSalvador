@@ -1,17 +1,19 @@
 /**
  * results.js
- * ──────────────────────────────────────────────────────
- * Envío y visualización de resultados desde Firestore.
- * Los resultados se actualizan en tiempo real via onSnapshot.
+ * Tabla de resultados pública pero filtrada:
+ *  - Organizador → ve todas las categorías.
+ *  - Competidor  → solo ve las categorías en que ya participó.
  */
 
 const Results = (() => {
 
   let currentCat = null;
+  const MO3_CATS = new Set(['6x6', '7x7']);
+  const isMo3 = (cat) => MO3_CATS.has(cat);
 
   // ── Enviar resultados ────────────────────────────────
 
-  async function submit() {
+  function submit() {
     const result = {
       name:      AppState.contestant.name,
       email:     AppState.contestant.email,
@@ -23,23 +25,19 @@ const Results = (() => {
       timestamp: new Date().toISOString(),
     };
 
-    try {
-      await Storage.saveResult(result);
-      AppState.results.push(result);
-      AppState.lastOwnResult = result;
+    AppState.results.push(result);
+    Storage.save('results', AppState.results);
+    AppState.lastOwnResult = result;
 
-      const catName = AppState.contest.categories[AppState.contestant.category]?.name || '';
-      document.getElementById('success-msg').textContent =
-        `${result.name} — ${catName} — Ao5: ${result.ao5}`;
-      document.getElementById('modal-success').classList.add('open');
-    } catch (err) {
-      console.error('[Results] submit:', err);
-      UI.toast('⚠ Error al enviar resultados. Intentá de nuevo.');
-    }
+    const catName = AppState.contest.categories[AppState.contestant.category]?.name || '';
+    document.getElementById('success-msg').textContent =
+      `${result.name} — ${catName} — Ao5: ${result.ao5}`;
+
+    document.getElementById('modal-success').classList.add('open');
   }
 
   // ── Renderizar tabla ─────────────────────────────────
-  // visibleCats: array de IDs permitidos. null = organizador (ve todo).
+  // visibleCats: array de IDs permitidos. null/undefined = organizador (ve todo).
 
   function render(visibleCats) {
     const allCatsInResults = {};
@@ -52,6 +50,7 @@ const Results = (() => {
 
     const tabsEl = document.getElementById('result-cat-tabs');
     tabsEl.innerHTML = '';
+
     const noEl = document.getElementById('no-results');
 
     if (!catIds.length) {
@@ -59,7 +58,7 @@ const Results = (() => {
       noEl.style.display = '';
       noEl.textContent   = visibleCats
         ? 'Todavía no hay resultados en las categorías en que participaste.'
-        : 'Aún no hay resultados.';
+        : 'Aún no hay resultados en esta categoría.';
       return;
     }
 
@@ -81,8 +80,25 @@ const Results = (() => {
     const tbody = document.getElementById('results-tbody');
     tbody.innerHTML = '';
 
-    if (!filtered.length) { noEl.style.display = ''; return; }
+    if (!filtered.length) {
+      noEl.style.display = '';
+      return;
+    }
     noEl.style.display = 'none';
+
+    // Adaptar cabecera de la tabla según Mo3 o Ao5
+    const mo3 = isMo3(currentCat);
+    const totalSolves = mo3 ? 3 : 5;
+    const statLabel   = mo3 ? 'Mo3' : 'Ao5';
+    const thead = document.querySelector('#results-table thead tr');
+    if (thead) {
+      // Reconstruir cabecera dinámica
+      thead.innerHTML = `<th>#</th><th>Nombre</th>`;
+      for (let i = 1; i <= totalSolves; i++) {
+        thead.innerHTML += `<th>S${i}</th>`;
+      }
+      thead.innerHTML += `<th>Mejor</th><th>${statLabel}</th>`;
+    }
 
     filtered.forEach((r, idx) => {
       const tr = document.createElement('tr');
@@ -93,7 +109,8 @@ const Results = (() => {
         const cls = s.penalty === 'dnf' ? 'time-dnf' : s.penalty === 'plus2' ? 'time-plus' : '';
         return `<td class="${cls}">${t}</td>`;
       }).join('');
-      const padding = Array(5 - (r.solves || []).length).fill('<td>—</td>').join('');
+
+      const padding = Array(totalSolves - (r.solves || []).length).fill('<td>—</td>').join('');
       const isOwn   = AppState.contestant && r.email === AppState.contestant.email;
 
       tr.innerHTML = `
@@ -113,14 +130,18 @@ const Results = (() => {
   function exportCSV() {
     if (!currentCat) return;
     const catName = AppState.contest.categories[currentCat]?.name || currentCat;
-    const rows = [['#', 'Nombre', 'Email', 'S1', 'S2', 'S3', 'S4', 'S5', 'Mejor', 'Ao5']];
+    const mo3csv    = isMo3(currentCat);
+    const totalCsv  = mo3csv ? 3 : 5;
+    const statCsv   = mo3csv ? 'Mo3' : 'Ao5';
+    const solveHdrs = Array.from({length: totalCsv}, (_, i) => `S${i+1}`);
+    const rows = [['#', 'Nombre', 'Email', ...solveHdrs, 'Mejor', statCsv]];
 
     AppState.results
       .filter(r => r.category === currentCat)
       .sort((a, b) => (a.ao5ms ?? Infinity) - (b.ao5ms ?? Infinity))
       .forEach((r, i) => {
         const solves = (r.solves || []).map(s => Timer.formatSolve(s));
-        while (solves.length < 5) solves.push('—');
+        while (solves.length < totalCsv) solves.push('—');
         rows.push([i + 1, r.name, r.email, ...solves, r.best || '—', r.ao5 || '—']);
       });
 

@@ -696,3 +696,186 @@ tr:hover td { background: rgba(255, 255, 255, 0.02); }
   from { opacity: 0; transform: scale(0.95); }
   to   { opacity: 1; transform: scale(1); }
 }
+
+/* ── Inspección — estados del timer ─────────────────── */
+
+.timer-display.inspection {
+  color: var(--accent2, #f0c040);
+  transition: color 0.25s;
+}
+
+/* Últimos 8 segundos */
+.timer-display.inspection.warn {
+  color: #ff9922;
+  animation: pulse-warn 0.7s ease-in-out infinite alternate;
+}
+
+/* +2 (15s–17s) */
+.timer-display.inspection.plus2-warn {
+  color: #ff4444;
+  animation: pulse-warn 0.35s ease-in-out infinite alternate;
+}
+
+/* Hold — amarillo (manteniendo pero no listo) */
+.timer-display.inspection.hold-yellow {
+  color: #f0c040 !important;
+  animation: none;
+}
+
+/* Hold — verde (listo para soltar) */
+.timer-display.inspection.hold-green {
+  color: #22dd66 !important;
+  animation: none;
+  text-shadow: 0 0 32px rgba(34, 221, 102, 0.6);
+}
+
+@keyframes pulse-warn {
+  from { opacity: 1; }
+  to   { opacity: 0.5; }
+}
+
+/* ── Vista previa cubo 2D ───────────────────────────── */
+
+.cube-preview-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+  animation: fadeInDown 0.35s ease;
+}
+
+.cube-preview-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted, #888);
+}
+
+.cube-preview-container {
+  width: 100%;
+  max-width: 320px;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Sin borde, sin fondo — para que el cubo flote limpio */
+  background: transparent;
+  overflow: hidden;
+}
+
+/* Forzar fondo transparente en el web component */
+.cube-preview-container twisty-player {
+  --background: transparent !important;
+  --panel-background: transparent !important;
+  background: transparent !important;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Tabla de resultados — fila propia del usuario ──── */
+
+tr.own-row {
+  background: rgba(0, 229, 255, 0.06) !important;
+  outline: 1px solid rgba(0, 229, 255, 0.2);
+}
+
+.own-badge {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-family: 'Space Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent, #00e5ff);
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* ══════════════════════════════════════════════════════
+   MOBILE LAYOUT — timer arriba, scramble abajo
+   ══════════════════════════════════════════════════════ */
+
+@media (max-width: 700px) {
+
+  /* El contest-main ya es flex column — reordenar secciones */
+  .contest-main {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Orden en mobile:
+     1. timer-area (display + badge + hint + controles)
+     2. next-scramble-wrap (botón Ver Scramble)
+     3. scramble-display (texto del scramble)
+     4. cube-preview-wrap
+     5. submit-section
+  */
+  .timer-area          { order: 1; }
+  #next-scramble-wrap  { order: 2; }
+  #scramble-display    { order: 3; }
+  #cube-preview-wrap   { order: 4; }
+  #submit-section      { order: 5; }
+
+  /* Reducir tamaño del cubo en mobile para no ocupar tanto espacio */
+  #cube-preview twisty-player {
+    height: 140px !important;
+  }
+
+  /* Scramble más compacto en mobile */
+  .scramble-display {
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .scramble-text {
+    font-size: 0.78rem;
+    line-height: 1.6;
+  }
+
+  /* Timer más grande y centrado en mobile */
+  .timer-area {
+    padding: 1rem 0 0.5rem;
+  }
+}
+
+/* Cargar las nuevas fuentes */
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+/* Timer display — fuente más limpia */
+.timer-display {
+  font-family: 'DM Mono', 'Space Mono', monospace !important;
+  letter-spacing: -0.02em;
+}
+
+/* Labels y badges — monospace más suave */
+.sidebar-label,
+.scramble-header,
+.solve-badge,
+.timer-hint,
+.ao-row span:first-child,
+.si-num {
+  font-family: 'DM Mono', 'Space Mono', monospace !important;
+}
+
+/* Textos de UI general — sans-serif más tranquila */
+.landing-title,
+.form-title,
+.panel-title,
+h1, h2, h3 {
+  font-family: 'Plus Jakarta Sans', 'Syne', sans-serif !important;
+}
+
+/* Scramble text — mono legible */
+.scramble-text {
+  font-family: 'DM Mono', 'Space Mono', monospace !important;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  line-height: 1.7;
+}

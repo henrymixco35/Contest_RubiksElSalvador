@@ -41,6 +41,17 @@ const Timer = (() => {
   const INSPECTION_MS = 15000;
   const PLUS2_END_MS  = 17000;
 
+  // Categorías que usan 3 solves (Mo3) en lugar de 5 (Ao5)
+  const MO3_CATS = new Set(['6x6', '7x7']);
+
+  function _totalSolves() {
+    return MO3_CATS.has(AppState.contestant?.category) ? 3 : 5;
+  }
+
+  function _isMo3() {
+    return MO3_CATS.has(AppState.contestant?.category);
+  }
+
   // ── Estado interno ───────────────────────────────────
 
   let inspectionInterval = null;
@@ -75,6 +86,12 @@ const Timer = (() => {
     document.getElementById('scramble-display').style.display        = '';
     document.getElementById('next-scramble-wrap').style.display      = '';
     document.getElementById('timer-controls').style.display          = 'none';
+    // Actualizar label Mo3/Ao5 en sidebar
+    const ao5LabelEl = document.getElementById('ao-label');
+    if (ao5LabelEl) ao5LabelEl.textContent = getStatLabel();
+    // Actualizar total de solves en el header del scramble
+    const totalEl = document.getElementById('total-solve-num');
+    if (totalEl) totalEl.textContent = _totalSolves();
   }
 
   // ── Handlers principales (llamados desde main.js) ────
@@ -148,13 +165,22 @@ const Timer = (() => {
   }
 
   function getAo5Display() {
-    if (AppState.solves.length < 5) return '—';
+    const total = _totalSolves();
+    if (AppState.solves.length < total) return '—';
+    if (_isMo3()) return _calcMo3Display(AppState.solves);
     return _calcAo5Display(AppState.solves);
   }
 
   function getAo5Ms() {
-    if (AppState.solves.length < 5) return Infinity;
+    const total = _totalSolves();
+    if (AppState.solves.length < total) return Infinity;
+    if (_isMo3()) return _calcMo3Ms(AppState.solves);
     return _calcAo5Ms(AppState.solves);
+  }
+
+  // Label dinámico para la UI (Ao5 o Mo3)
+  function getStatLabel() {
+    return _isMo3() ? 'Mo3' : 'Ao5';
   }
 
   // ── Inspección ───────────────────────────────────────
@@ -183,7 +209,7 @@ const Timer = (() => {
         AppState.scrambleRevealed = false;
         AppState.timerState       = 'idle';
         _renderSolveList();
-        if (AppState.currentSolve >= 5) {
+        if (AppState.currentSolve >= _totalSolves()) {
           _showFinalSummary();
         } else {
           _resetDisplay();
@@ -313,7 +339,7 @@ const Timer = (() => {
 
     _renderSolveList();
 
-    if (AppState.currentSolve >= 5) { _showFinalSummary(); return; }
+    if (AppState.currentSolve >= _totalSolves()) { _showFinalSummary(); return; }
 
     _resetDisplay();
     _updateScrambleDisplay();
@@ -381,8 +407,11 @@ const Timer = (() => {
     disp.className   = 'timer-display';
     disp.textContent = '0:00.00';
     document.getElementById('timer-hint').textContent  = 'Presioná "Ver Scramble" para continuar';
+    const total = _totalSolves();
     document.getElementById('solve-badge').textContent = `SOLVE ${AppState.currentSolve + 1}`;
     document.getElementById('current-solve-num').textContent = AppState.currentSolve + 1;
+    const totalEl = document.getElementById('total-solve-num');
+    if (totalEl) totalEl.textContent = total;
   }
 
   function _applyPenaltyUI() {
@@ -409,7 +438,7 @@ const Timer = (() => {
     const list = document.getElementById('solve-list');
     list.innerHTML = '';
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < _totalSolves(); i++) {
       const done    = i < AppState.solves.length;
       const current = i === AppState.currentSolve;
       const solve   = AppState.solves[i];
@@ -440,6 +469,8 @@ const Timer = (() => {
 
     document.getElementById('ao-best').textContent = getBestDisplay();
     document.getElementById('ao-ao5').textContent  = getAo5Display();
+    const ao5LabelEl = document.getElementById('ao-label');
+    if (ao5LabelEl) ao5LabelEl.textContent = getStatLabel();
   }
 
   function _showFinalSummary() {
@@ -476,7 +507,7 @@ const Timer = (() => {
 
     const ao5Row = document.createElement('div');
     ao5Row.className = 'final-stat';
-    ao5Row.innerHTML = `<span class="label">Ao5</span><span class="value" style="color:var(--accent3)">${getAo5Display()}</span>`;
+    ao5Row.innerHTML = `<span class="label">${getStatLabel()}</span><span class="value" style="color:var(--accent3)">${getAo5Display()}</span>`;
     summary.appendChild(ao5Row);
 
     document.getElementById('submit-section').classList.add('visible');
@@ -494,6 +525,18 @@ const Timer = (() => {
     return ms === Infinity ? 'DNF' : msToDisplay(ms);
   }
 
+  // Mo3: promedio simple de 3 solves (sin quitar mejor/peor)
+  function _calcMo3Ms(solves) {
+    const times = solves.map(getSolveMs);
+    if (times.some(t => t === Infinity)) return Infinity;
+    return times.reduce((a, b) => a + b, 0) / 3;
+  }
+
+  function _calcMo3Display(solves) {
+    const ms = _calcMo3Ms(solves);
+    return ms === Infinity ? 'DNF' : msToDisplay(ms);
+  }
+
   return {
     init,
     handlePress,
@@ -506,6 +549,7 @@ const Timer = (() => {
     getBestDisplay,
     getAo5Display,
     getAo5Ms,
+    getStatLabel,
     formatSolve:  (s)  => formatSolve(s),
     getSolveMs:   (s)  => getSolveMs(s),
     msToDisplay:  (ms) => msToDisplay(ms),
