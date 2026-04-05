@@ -1,15 +1,17 @@
 /**
  * timer.js
  * ──────────────────────────────────────────────────────
- * Lógica del cronómetro: iniciar, detener, penalizaciones,
- * revelar scramble y avanzar al siguiente solve.
+ * Cronómetro con inspección WCA estilo cstimer:
+ *   • Revelás scramble → inspección inicia automáticamente
+ *   • Presionás y mantenés → amarillo → verde (0.6s) → soltás → corre
+ *   • +2 si pasás 15s, DNF automático si pasás 17s
+ *   • Muestra el estado del cubo en 2D con cubing.js
  */
 
 const Timer = (() => {
 
-  // ── Helpers de formato ───────────────────────────────
+  // ── Formato ──────────────────────────────────────────
 
-  /** Convierte milisegundos a string "M:SS.CC" o "S.CC" */
   function msToDisplay(ms) {
     const totalSec = ms / 1000;
     const min  = Math.floor(totalSec / 60);
@@ -21,13 +23,11 @@ const Timer = (() => {
     return `${sec}.${String(cent).padStart(2, '0')}`;
   }
 
-  /** Devuelve los ms efectivos de un solve (incluyendo +2 e Infinity para DNF) */
   function getSolveMs(solve) {
     if (solve.penalty === 'dnf') return Infinity;
     return solve.ms + (solve.penalty === 'plus2' ? 2000 : 0);
   }
 
-  /** Formatea un solve para mostrar en tabla/sidebar */
   function formatSolve(solve) {
     if (!solve) return '—';
     if (solve.penalty === 'dnf') return 'DNF';
@@ -35,16 +35,34 @@ const Timer = (() => {
     return msToDisplay(ms) + (solve.penalty === 'plus2' ? ' +2' : '');
   }
 
-  // ── Inicialización del contest ───────────────────────
+  // ── Constantes ───────────────────────────────────────
+
+  const HOLD_MS       = 600;
+  const INSPECTION_MS = 15000;
+  const PLUS2_END_MS  = 17000;
+
+  // ── Estado interno ───────────────────────────────────
+
+  let inspectionInterval = null;
+  let inspectionStart    = 0;
+  let inspectionPenalty  = null;
+
+  let holdTimeout = null;
+  let holdReady   = false;
+  let isHolding   = false;
+
+  // ── Init ─────────────────────────────────────────────
 
   function init() {
-    AppState.solves          = [];
-    AppState.currentSolve    = 0;
+    AppState.solves           = [];
+    AppState.currentSolve     = 0;
     AppState.scrambleRevealed = false;
-    AppState.currentPenalty  = null;
-    AppState.timerState      = 'idle';
+    AppState.currentPenalty   = null;
+    AppState.timerState       = 'idle';
 
-    // Sidebar
+    _clearInspection();
+    _clearHold();
+
     document.getElementById('sb-name').textContent = AppState.contestant.name;
     const catData = AppState.contest.categories[AppState.contestant.category];
     document.getElementById('sb-cat').textContent  = catData ? catData.name : AppState.contestant.category;
@@ -54,61 +72,64 @@ const Timer = (() => {
     _updateScrambleDisplay();
 
     document.getElementById('submit-section').classList.remove('visible');
-    document.getElementById('scramble-display').style.display = '';
+    document.getElementById('scramble-display').style.display   = '';
     document.getElementById('next-scramble-wrap').style.display = '';
-    document.getElementById('timer-controls').style.display = 'none';
+    document.getElementById('timer-controls').style.display     = 'none';
   }
 
-  // ── Acción principal (espacio / toque) ───────────────
+  // ── Handlers principales (llamados desde main.js) ────
 
-  function handleAction() {
-    if (!AppState.scrambleRevealed) {
-      UI.toast('⚠ Primero revelá el scramble');
-      return;
+  function handlePress() {
+    const state = AppState.timerState;
+    if (state === 'running')    { _stop();      return; }
+    if (state === 'stopped')    { _next();      return; }
+    if (state === 'inspection') { _beginHold(); return; }
+    // idle: usuario debe revelar el scramble primero
+  }
+
+  function handleRelease() {
+    if (AppState.timerState === 'inspection' && isHolding) {
+      if (holdReady) {
+        _clearHold();
+        _startTimer();
+      } else {
+        _clearHold();
+        _restoreInspectionDisplay();
+      }
     }
-    if (AppState.currentSolve >= 5) return;
-
-    if      (AppState.timerState === 'idle')    _start();
-    else if (AppState.timerState === 'running') _stop();
-    else if (AppState.timerState === 'stopped') _next();
   }
 
-  // ── Revelar scramble ─────────────────────────────────
+  // Compatibilidad con onclick en botones del HTML
+  function handleAction() {}
+
+  // ── Revelar scramble → arranca inspección ────────────
 
   function revealScramble() {
     AppState.scrambleRevealed = true;
     _updateScrambleDisplay();
-    document.getElementById('timer-hint').textContent =
-      'Presioná Espacio o tocá la pantalla para iniciar';
+    _startInspection();
   }
 
-  // ── Penalizaciones ───────────────────────────────────
+  // ── Penalizaciones post-solve ────────────────────────
 
   function togglePenalty(type) {
     if (AppState.timerState !== 'stopped') return;
-
-    // Toggle: si ya estaba activa la misma, la quitamos
     AppState.currentPenalty = (AppState.currentPenalty === type) ? null : type;
-
     _applyPenaltyUI();
   }
 
   // ── Abandonar ────────────────────────────────────────
 
   function abandon() {
+    _clearInspection();
+    _clearHold();
     clearInterval(AppState.timerInterval);
     AppState.timerState = 'idle';
     UI.closeModal('modal-abandon');
     UI.showView('view-landing');
   }
 
-  // ── Accesores públicos ───────────────────────────────
-
-  function getSolveMs_public(solve) { return getSolveMs(solve); }
-  function formatSolve_public(solve) { return formatSolve(solve); }
-  function msToDisplay_public(ms)   { return msToDisplay(ms); }
-
-  // ── Estadísticas ─────────────────────────────────────
+  // ── Stats públicas ───────────────────────────────────
 
   function getBestDisplay() {
     if (!AppState.solves.length) return '—';
@@ -126,22 +147,125 @@ const Timer = (() => {
     return _calcAo5Ms(AppState.solves);
   }
 
-  // ── Privados ─────────────────────────────────────────
+  // ── Inspección ───────────────────────────────────────
 
-  function _start() {
-    AppState.timerState   = 'running';
-    AppState.timerStart   = performance.now();
-    AppState.currentPenalty = null;
+  function _startInspection() {
+    AppState.timerState = 'inspection';
+    inspectionStart     = performance.now();
+    inspectionPenalty   = null;
 
     const disp = document.getElementById('timer-display');
-    disp.className = 'timer-display running';
+    disp.className   = 'timer-display inspection';
+    disp.textContent = '15';
 
-    document.getElementById('timer-hint').textContent = 'Tocá para detener';
+    document.getElementById('timer-hint').textContent =
+      'Mantené presionado Espacio / pantalla para iniciar';
     document.getElementById('timer-controls').style.display = 'none';
+
+    inspectionInterval = setInterval(() => {
+      const elapsed = performance.now() - inspectionStart;
+
+      if (elapsed >= PLUS2_END_MS) {
+        _clearInspection();
+        _clearHold();
+        AppState.solves.push({ ms: 0, penalty: 'dnf' });
+        AppState.currentSolve++;
+        AppState.scrambleRevealed = false;
+        AppState.timerState       = 'idle';
+        _renderSolveList();
+        if (AppState.currentSolve >= 5) {
+          _showFinalSummary();
+        } else {
+          _resetDisplay();
+          _updateScrambleDisplay();
+          document.getElementById('scramble-display').style.display   = '';
+          document.getElementById('next-scramble-wrap').style.display = '';
+        }
+        return;
+      }
+
+      if (elapsed >= INSPECTION_MS) {
+        inspectionPenalty = 'plus2';
+        disp.textContent  = '+2';
+        disp.className    = 'timer-display inspection plus2-warn';
+        return;
+      }
+
+      const secs = Math.ceil((INSPECTION_MS - elapsed) / 1000);
+      disp.textContent = secs.toString();
+      disp.className   = 'timer-display inspection' + (secs <= 8 ? ' warn' : '');
+    }, 50);
+  }
+
+  function _clearInspection() {
+    clearInterval(inspectionInterval);
+    inspectionInterval = null;
+  }
+
+  function _restoreInspectionDisplay() {
+    if (AppState.timerState !== 'inspection') return;
+    const elapsed = performance.now() - inspectionStart;
+    const disp    = document.getElementById('timer-display');
+    if (elapsed >= INSPECTION_MS) {
+      disp.textContent = '+2';
+      disp.className   = 'timer-display inspection plus2-warn';
+    } else {
+      const secs = Math.ceil((INSPECTION_MS - elapsed) / 1000);
+      disp.textContent = secs.toString();
+      disp.className   = 'timer-display inspection' + (secs <= 8 ? ' warn' : '');
+    }
+    document.getElementById('timer-hint').textContent =
+      'Mantené presionado Espacio / pantalla para iniciar';
+  }
+
+  // ── Hold-to-start estilo cstimer ─────────────────────
+
+  function _beginHold() {
+    if (isHolding) return;
+    isHolding = true;
+    holdReady = false;
+
+    const disp = document.getElementById('timer-display');
+    disp.className = 'timer-display inspection hold-yellow';
+    document.getElementById('timer-hint').textContent = 'Seguí manteniendo…';
+
+    holdTimeout = setTimeout(() => {
+      if (!isHolding) return;
+      holdReady      = true;
+      disp.className = 'timer-display inspection hold-green';
+      document.getElementById('timer-hint').textContent = '¡Soltá para empezar!';
+    }, HOLD_MS);
+  }
+
+  function _clearHold() {
+    clearTimeout(holdTimeout);
+    holdTimeout = null;
+    holdReady   = false;
+    isHolding   = false;
+  }
+
+  // ── Timer real ───────────────────────────────────────
+
+  function _startTimer() {
+    _clearInspection();
+    const prepenalty  = inspectionPenalty;
+    inspectionPenalty = null;
+
+    AppState.timerState     = 'running';
+    AppState.timerStart     = performance.now();
+    AppState.currentPenalty = prepenalty;
+
+    const disp = document.getElementById('timer-display');
+    disp.className   = 'timer-display running';
+    disp.textContent = '0.00';
+    document.getElementById('timer-hint').textContent = 'Tocá para detener';
+
+    const cubeWrap = document.getElementById('cube-preview-wrap');
+    if (cubeWrap) cubeWrap.style.display = 'none';
 
     AppState.timerInterval = setInterval(() => {
       const elapsed = performance.now() - AppState.timerStart;
-      AppState.timerValue = elapsed;
+      AppState.timerValue   = elapsed;
       document.getElementById('timer-display').textContent = msToDisplay(elapsed);
     }, 10);
   }
@@ -149,74 +273,111 @@ const Timer = (() => {
   function _stop() {
     clearInterval(AppState.timerInterval);
     const elapsed = performance.now() - AppState.timerStart;
-    AppState.timerValue   = elapsed;
-    AppState.timerState   = 'stopped';
+    AppState.timerValue = elapsed;
+    AppState.timerState = 'stopped';
 
     const disp = document.getElementById('timer-display');
-    disp.className   = 'timer-display stopped';
-    disp.textContent = msToDisplay(elapsed);
+    disp.className = 'timer-display stopped';
+
+    if (AppState.currentPenalty === 'plus2') {
+      disp.textContent = msToDisplay(elapsed + 2000) + ' +2';
+      document.getElementById('btn-plus2').className = 'btn-penalize active';
+    } else {
+      disp.textContent = msToDisplay(elapsed);
+      document.getElementById('btn-plus2').className = 'btn-penalize';
+    }
+    document.getElementById('btn-dnf').className = 'btn-penalize';
 
     document.getElementById('timer-hint').textContent =
       'Tocá para continuar · Aplicá +2 o DNF si corresponde';
     document.getElementById('timer-controls').style.display = 'flex';
-
-    // Resetear botones de penalización
-    document.getElementById('btn-plus2').className = 'btn-penalize';
-    document.getElementById('btn-dnf').className   = 'btn-penalize';
   }
 
   function _next() {
-    // Guardar el solve actual
-    AppState.solves.push({
-      ms: AppState.timerValue,
-      penalty: AppState.currentPenalty,
-    });
+    AppState.solves.push({ ms: AppState.timerValue, penalty: AppState.currentPenalty });
     AppState.currentSolve++;
     AppState.scrambleRevealed = false;
     AppState.timerState       = 'idle';
     AppState.currentPenalty   = null;
+    inspectionPenalty         = null;
 
     _renderSolveList();
 
-    if (AppState.currentSolve >= 5) {
-      _showFinalSummary();
-      return;
-    }
+    if (AppState.currentSolve >= 5) { _showFinalSummary(); return; }
 
     _resetDisplay();
     _updateScrambleDisplay();
-    document.getElementById('timer-controls').style.display = 'none';
-    document.getElementById('scramble-display').style.display = '';
+    document.getElementById('timer-controls').style.display     = 'none';
+    document.getElementById('scramble-display').style.display   = '';
     document.getElementById('next-scramble-wrap').style.display = '';
   }
+
+  // ── Scramble display + cubo 2D ───────────────────────
+
+  const PUZZLE_MAP = {
+    '2x2':   '2x2x2',   '3x3':  '3x3x3',  '4x4':  '4x4x4',
+    '5x5':   '5x5x5',   '6x6':  '6x6x6',  '7x7':  '7x7x7',
+    'clock': 'clock',   'mega': 'megaminx','pyra': 'pyraminx',
+    'skewb': 'skewb',   'sq1':  'square1', '3oh':  '3x3x3',
+    '3bld':  '3x3x3',
+  };
+
+  function _updateScrambleDisplay() {
+    const text     = document.getElementById('scramble-text');
+    const btn      = document.getElementById('btn-reveal');
+    const cubeWrap = document.getElementById('cube-preview-wrap');
+
+    if (!AppState.scrambleRevealed) {
+      text.innerHTML    = '<span class="scramble-locked">Presioná "Ver Scramble" para continuar</span>';
+      btn.style.display = '';
+      if (cubeWrap) cubeWrap.style.display = 'none';
+    } else {
+      const catData = AppState.contest.categories[AppState.contestant.category];
+      const scr     = catData?.scrambles?.[AppState.currentSolve] || '— Sin scramble —';
+      text.textContent  = scr;
+      btn.style.display = 'none';
+      if (cubeWrap) {
+        cubeWrap.style.display = '';
+        _renderCubePreview(AppState.contestant.category, scr);
+      }
+    }
+  }
+
+  function _renderCubePreview(catId, scramble) {
+    const container = document.getElementById('cube-preview');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const player = document.createElement('twisty-player');
+    player.setAttribute('puzzle',                    PUZZLE_MAP[catId] || '3x3x3');
+    player.setAttribute('visualization',             '2D');
+    player.setAttribute('control-panel',             'none');
+    player.setAttribute('hint-facelets',             'none');
+    player.setAttribute('back-view',                 'none');
+    player.setAttribute('experimental-setup-alg',    scramble);
+    player.setAttribute('experimental-setup-anchor', 'end');
+    player.setAttribute('alg',                       '');
+    player.setAttribute('tempo-scale',               '0');
+    player.setAttribute('style',
+      'width:100%;height:200px;--background:transparent;--panel-background:transparent;background:transparent;');
+
+    container.appendChild(player);
+  }
+
+  // ── Helpers display ──────────────────────────────────
 
   function _resetDisplay() {
     const disp = document.getElementById('timer-display');
     disp.className   = 'timer-display';
     disp.textContent = '0:00.00';
-    document.getElementById('timer-hint').textContent  = 'Presioná Espacio o tocá para iniciar';
+    document.getElementById('timer-hint').textContent  = 'Presioná "Ver Scramble" para continuar';
     document.getElementById('solve-badge').textContent = `SOLVE ${AppState.currentSolve + 1}`;
     document.getElementById('current-solve-num').textContent = AppState.currentSolve + 1;
   }
 
-  function _updateScrambleDisplay() {
-    const text = document.getElementById('scramble-text');
-    const btn  = document.getElementById('btn-reveal');
-
-    if (!AppState.scrambleRevealed) {
-      text.innerHTML = '<span class="scramble-locked">Presioná "Ver Scramble" para continuar</span>';
-      btn.style.display = '';
-    } else {
-      const catData = AppState.contest.categories[AppState.contestant.category];
-      const scr = catData?.scrambles?.[AppState.currentSolve] || '— Sin scramble configurado —';
-      text.textContent = scr;
-      btn.style.display = 'none';
-    }
-  }
-
   function _applyPenaltyUI() {
-    const p2 = document.getElementById('btn-plus2');
-    const dn = document.getElementById('btn-dnf');
+    const p2   = document.getElementById('btn-plus2');
+    const dn   = document.getElementById('btn-dnf');
     const disp = document.getElementById('timer-display');
 
     p2.className = 'btn-penalize' + (AppState.currentPenalty === 'plus2' ? ' active'     : '');
@@ -248,7 +409,7 @@ const Timer = (() => {
         + (current ? ' current' : '')
         + (done    ? ' done'    : '');
 
-      const num  = document.createElement('span');
+      const num = document.createElement('span');
       num.className   = 'si-num';
       num.textContent = `S${i + 1}`;
 
@@ -267,7 +428,6 @@ const Timer = (() => {
       list.appendChild(div);
     }
 
-    // Actualizar estadísticas del sidebar
     document.getElementById('ao-best').textContent = getBestDisplay();
     document.getElementById('ao-ao5').textContent  = getAo5Display();
   }
@@ -276,15 +436,15 @@ const Timer = (() => {
     document.getElementById('scramble-display').style.display   = 'none';
     document.getElementById('next-scramble-wrap').style.display = 'none';
     document.getElementById('timer-controls').style.display     = 'none';
+    const cubeWrap = document.getElementById('cube-preview-wrap');
+    if (cubeWrap) cubeWrap.style.display = 'none';
 
     const disp = document.getElementById('timer-display');
     disp.className   = 'timer-display';
     disp.textContent = '✓';
-
     document.getElementById('solve-badge').textContent = '¡COMPLETADO!';
     document.getElementById('timer-hint').textContent  = '';
 
-    // Construir resumen
     const summary = document.getElementById('final-summary');
     summary.innerHTML = `
       <h3 style="font-size:.75rem;letter-spacing:.15em;text-transform:uppercase;
@@ -313,8 +473,8 @@ const Timer = (() => {
   }
 
   function _calcAo5Ms(solves) {
-    const times = solves.map(getSolveMs).sort((a, b) => a - b);
-    const trimmed = times.slice(1, 4); // quita mejor y peor
+    const times   = solves.map(getSolveMs).sort((a, b) => a - b);
+    const trimmed = times.slice(1, 4);
     if (trimmed.some(t => t === Infinity)) return Infinity;
     return trimmed.reduce((a, b) => a + b, 0) / 3;
   }
@@ -324,9 +484,10 @@ const Timer = (() => {
     return ms === Infinity ? 'DNF' : msToDisplay(ms);
   }
 
-  // ── API pública ──────────────────────────────────────
   return {
     init,
+    handlePress,
+    handleRelease,
     handleAction,
     revealScramble,
     togglePenalty,
@@ -334,8 +495,8 @@ const Timer = (() => {
     getBestDisplay,
     getAo5Display,
     getAo5Ms,
-    formatSolve:   formatSolve_public,
-    getSolveMs:    getSolveMs_public,
-    msToDisplay:   msToDisplay_public,
+    formatSolve:  (s)  => formatSolve(s),
+    getSolveMs:   (s)  => getSolveMs(s),
+    msToDisplay:  (ms) => msToDisplay(ms),
   };
 })();

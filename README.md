@@ -5,7 +5,7 @@ desarrollada para la Comunidad Rubik's El Salvador.
 
 ## 🌐 Demo
 
-Desplegada en GitHub Pages: `https://tu-usuario.github.io/rubiks-sv-contest`
+Desplegada en GitHub Pages: `https://henrymixco35.github.io/Contest_RubiksElSalvador/`
 
 ---
 
