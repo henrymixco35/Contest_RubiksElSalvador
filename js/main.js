@@ -1,12 +1,5 @@
 /**
  * main.js
- * ──────────────────────────────────────────────────────
- * Fix clave para móvil: diferenciar scroll de tap intencional.
- * Un toque que se mueve más de 10px se considera scroll → ignorar.
- *
- * FIXES:
- *  - Eliminado el segundo listener de touchend que cancelaba el hold-to-start.
- *  - Ahora touchend maneja tanto tap simple como release de hold correctamente.
  */
 
 (async function init() {
@@ -28,9 +21,9 @@
   _showLoader(false);
   UI.refreshLandingActions();
 
-  // Suscripción en tiempo real a resultados (Firestore onSnapshot)
   AppState._unsubscribeResults = Storage.subscribeResults((freshResults) => {
     AppState.results = freshResults;
+    if (AppState.isOrganizer) Organizer.refreshPendingBadge();
     if (document.getElementById('view-results').classList.contains('active')) {
       const visibleCats = AppState.isOrganizer ? null
         : (AppState.contestant
@@ -40,7 +33,6 @@
     }
   });
 
-  // Firebase Auth — detectar sesión del organizador
   FB.onAuthStateChanged(auth, (user) => {
     if (user) {
       AppState.isOrganizer = true;
@@ -51,8 +43,6 @@
       AppState.isOrganizer = false;
     }
   });
-
-  // ── Listeners de teclado ─────────────────────────────
 
   document.addEventListener('keydown', (e) => {
     if (!document.getElementById('view-contest').classList.contains('active')) return;
@@ -68,132 +58,60 @@
     Timer.handleRelease();
   });
 
-  // ── Touch en la zona del timer ───────────────────────
-  //
-  // Lógica unificada en UN SOLO conjunto de listeners:
-  //
-  //  touchstart  → registrar posición inicial
-  //  touchmove   → detectar si fue scroll
-  //  touchend    → si no fue scroll:
-  //                  · estado running/stopped → handlePress()
-  //                  · estado inspection (hold activo) → handleRelease()
-  //                  · estado idle/inspection (sin hold) → handlePress()
-  //  touchcancel → limpiar estado
-
   const contestMain      = document.getElementById('contest-main');
-  const SCROLL_THRESHOLD = 10; // px de movimiento para considerar scroll
-
-  let touchStartY = 0;
-  let touchStartX = 0;
-  let touchMoved  = false;
+  const SCROLL_THRESHOLD = 10;
+  let touchStartY = 0, touchStartX = 0, touchMoved = false;
 
   contestMain.addEventListener('touchstart', (e) => {
     if (e.target.closest('button, a, input, select, textarea, .solve-item')) return;
     touchStartY = e.touches[0].clientY;
     touchStartX = e.touches[0].clientX;
     touchMoved  = false;
-
-    // Iniciar hold si estamos en inspección
-    if (AppState.timerState === 'inspection') {
-      Timer.handlePress();
-    }
+    if (AppState.timerState === 'inspection') Timer.handlePress();
   }, { passive: true });
 
   contestMain.addEventListener('touchmove', (e) => {
-    const dy = Math.abs(e.touches[0].clientY - touchStartY);
-    const dx = Math.abs(e.touches[0].clientX - touchStartX);
-    if (dy > SCROLL_THRESHOLD || dx > SCROLL_THRESHOLD) {
-      touchMoved = true;
-    }
+    if (Math.abs(e.touches[0].clientY - touchStartY) > SCROLL_THRESHOLD ||
+        Math.abs(e.touches[0].clientX - touchStartX) > SCROLL_THRESHOLD) touchMoved = true;
   }, { passive: true });
 
   contestMain.addEventListener('touchend', (e) => {
     if (e.target.closest('button, a, input, select, textarea, .solve-item')) return;
-    if (touchMoved) {
-      // Era scroll; si había hold iniciado, cancelarlo
-      if (AppState.timerState === 'inspection') {
-        Timer.handleRelease();
-      }
-      return;
-    }
-
+    if (touchMoved) { if (AppState.timerState === 'inspection') Timer.handleRelease(); return; }
     e.preventDefault();
-
-    const state = AppState.timerState;
-
-    if (state === 'inspection') {
-      // Soltar durante inspección → release del hold
-      Timer.handleRelease();
-    } else {
-      // idle, running, stopped → press normal
-      Timer.handlePress();
-    }
+    if (AppState.timerState === 'inspection') Timer.handleRelease();
+    else Timer.handlePress();
   }, { passive: false });
 
   contestMain.addEventListener('touchcancel', () => {
     touchMoved = true;
-    if (AppState.timerState === 'inspection') {
-      Timer.handleRelease();
-    }
+    if (AppState.timerState === 'inspection') Timer.handleRelease();
   }, { passive: true });
-
-  // ── Click (fallback desktop) ─────────────────────────
 
   contestMain.addEventListener('click', (e) => {
     if (e.target.closest('button, a, input, select, textarea, .solve-item')) return;
     const state = AppState.timerState;
-    if (state === 'stopped' || state === 'running') {
-      Timer.handlePress();
-    }
+    if (state === 'stopped' || state === 'running') Timer.handlePress();
   });
-
-  // ── Cerrar modales al click en fondo ─────────────────
 
   document.querySelectorAll('.modal-overlay').forEach(overlay => {
-    overlay.addEventListener('click', (e) => {
-      if (e.target === overlay) overlay.classList.remove('open');
-    });
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.classList.remove('open'); });
   });
 
-  // Enter en inputs del modal de email
   const emailLoginInput = document.getElementById('email-login-input');
-  if (emailLoginInput) {
-    emailLoginInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') UI.submitEmailLogin();
-    });
-  }
+  if (emailLoginInput) emailLoginInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') UI.submitEmailLogin(); });
 
-  // Enter en login del organizador
   const orgPass = document.getElementById('org-pass');
-  if (orgPass) {
-    orgPass.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') Organizer.login();
-    });
-  }
+  if (orgPass) orgPass.addEventListener('keydown', (e) => { if (e.key === 'Enter') Organizer.login(); });
 
 })();
-
-/* ── Loader ───────────────────────────────────────────── */
 
 function _showLoader(show) {
   let el = document.getElementById('app-loader');
   if (!el && show) {
     el = document.createElement('div');
     el.id = 'app-loader';
-    el.innerHTML = `
-      <div style="
-        position:fixed;inset:0;background:var(--bg);
-        display:flex;flex-direction:column;align-items:center;justify-content:center;
-        z-index:9999;gap:1.2rem;font-family:'Space Mono',monospace;
-        font-size:.8rem;color:var(--muted);letter-spacing:.1em;">
-        <div style="width:36px;height:36px;border:2px solid var(--border);
-          border-top-color:var(--accent);border-radius:50%;
-          animation:spin .8s linear infinite;"></div>
-        CARGANDO CONTEST...
-        <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-      </div>`;
+    el.innerHTML = `<div style="position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;gap:1.2rem;font-family:'Space Mono',monospace;font-size:.8rem;color:var(--muted);letter-spacing:.1em;"><div style="width:36px;height:36px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;"></div>CARGANDO CONTEST...<style>@keyframes spin{to{transform:rotate(360deg)}}</style></div>`;
     document.body.appendChild(el);
-  } else if (el && !show) {
-    el.remove();
-  }
+  } else if (el && !show) { el.remove(); }
 }

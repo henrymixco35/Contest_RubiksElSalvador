@@ -1,11 +1,10 @@
 /**
  * results.js
- * Tabla de resultados pública pero filtrada:
- *  - Organizador → ve todas las categorías.
- *  - Competidor  → solo ve las categorías en que ya participó.
- *
- * FIX: submit() ahora usa Storage.saveResult() (Firestore) en lugar
- *      del incorrecto Storage.save() que era de localStorage.
+ * Sistema de aprobación:
+ *  - submit() guarda con status: 'pending'
+ *  - render() muestra solo 'approved' en la tabla pública
+ *  - El competidor siempre ve sus propios resultados con badge de estado
+ *  - El organizador ve todos los estados
  */
 
 const Results = (() => {
@@ -26,18 +25,18 @@ const Results = (() => {
       ao5:       Timer.getAo5Display(),
       ao5ms:     Timer.getAo5Ms(),
       timestamp: new Date().toISOString(),
+      status:    'pending',   // ← siempre pending al enviar
     };
 
     try {
-      // Guardar en Firestore (fix: antes llamaba Storage.save que no existe)
-      await Storage.saveResult(result);
+      const newId = await Storage.saveResult(result);
+      result.id = newId;
     } catch (err) {
       console.error('[Results] saveResult:', err);
       UI.toast('⚠ Error al guardar resultados. Intentá de nuevo.');
       return;
     }
 
-    // Actualizar estado local (el onSnapshot también lo hará, pero esto es inmediato)
     AppState.results.push(result);
     AppState.lastOwnResult = result;
 
@@ -48,12 +47,24 @@ const Results = (() => {
     document.getElementById('modal-success').classList.add('open');
   }
 
-  // ── Renderizar tabla ─────────────────────────────────
-  // visibleCats: array de IDs permitidos. null/undefined = organizador (ve todo).
+  // ── Renderizar tabla ──────────────────────────────────
+  // visibleCats: array de IDs permitidos. null = organizador (ve todo).
 
   function render(visibleCats) {
+    const isOrg   = AppState.isOrganizer;
+    const myEmail = AppState.contestant?.email || null;
+
+    // Organizador ve todos los statuses; competidor solo ve sus propios
+    // pendientes/rechazados + todos los aprobados
+    const relevantResults = AppState.results.filter(r => {
+      if (isOrg)                      return true;
+      if (r.status === 'approved')    return true;
+      if (r.email === myEmail)        return true; // propios aunque sean pending/rejected
+      return false;
+    });
+
     const allCatsInResults = {};
-    AppState.results.forEach(r => { allCatsInResults[r.category] = true; });
+    relevantResults.forEach(r => { allCatsInResults[r.category] = true; });
 
     let catIds = Object.keys(allCatsInResults);
     if (visibleCats) {
@@ -62,7 +73,6 @@ const Results = (() => {
 
     const tabsEl = document.getElementById('result-cat-tabs');
     tabsEl.innerHTML = '';
-
     const noEl = document.getElementById('no-results');
 
     if (!catIds.length) {
@@ -70,7 +80,7 @@ const Results = (() => {
       noEl.style.display = '';
       noEl.textContent   = visibleCats
         ? 'Todavía no hay resultados en las categorías en que participaste.'
-        : 'Aún no hay resultados en esta categoría.';
+        : 'Aún no hay resultados.';
       return;
     }
 
@@ -85,67 +95,125 @@ const Results = (() => {
       tabsEl.appendChild(btn);
     });
 
-    const filtered = AppState.results
+    // Para la tabla pública (competidor): ordenar aprobados primero, luego pendientes/rechazados propios
+    // Para el organizador: todos, ordenados por ao5ms
+    const filtered = relevantResults
       .filter(r => r.category === currentCat)
-      .sort((a, b) => (a.ao5ms ?? Infinity) - (b.ao5ms ?? Infinity));
+      .sort((a, b) => {
+        // Aprobados primero en ranking
+        if (a.status === 'approved' && b.status !== 'approved') return -1;
+        if (b.status === 'approved' && a.status !== 'approved') return  1;
+        return (a.ao5ms ?? Infinity) - (b.ao5ms ?? Infinity);
+      });
 
     const tbody = document.getElementById('results-tbody');
     tbody.innerHTML = '';
 
-    if (!filtered.length) {
-      noEl.style.display = '';
-      return;
-    }
+    if (!filtered.length) { noEl.style.display = ''; return; }
     noEl.style.display = 'none';
 
-    // Adaptar cabecera de la tabla según Mo3 o Ao5
-    const mo3 = isMo3(currentCat);
+    const mo3         = isMo3(currentCat);
     const totalSolves = mo3 ? 3 : 5;
     const statLabel   = mo3 ? 'Mo3' : 'Ao5';
     const thead = document.querySelector('#results-table thead tr');
     if (thead) {
       thead.innerHTML = `<th>#</th><th>Nombre</th>`;
-      for (let i = 1; i <= totalSolves; i++) {
-        thead.innerHTML += `<th>S${i}</th>`;
-      }
-      thead.innerHTML += `<th>Mejor</th><th>${statLabel}</th>`;
+      for (let i = 1; i <= totalSolves; i++) thead.innerHTML += `<th>S${i}</th>`;
+      thead.innerHTML += `<th>Mejor</th><th>${statLabel}</th><th>Estado</th>`;
     }
 
-    filtered.forEach((r, idx) => {
-      const tr = document.createElement('tr');
-      tr.className = ['', 'rank-1', 'rank-2', 'rank-3'][idx + 1] || '';
+    // Ranking real: solo los aprobados cuentan para el número de posición
+    let approvedRank = 0;
+
+    filtered.forEach((r) => {
+      const tr     = document.createElement('tr');
+      const isOwn  = myEmail && r.email === myEmail;
+      const status = r.status || 'pending';
+
+      // Número de posición solo para aprobados
+      let posCell = '—';
+      if (status === 'approved') {
+        approvedRank++;
+        posCell = approvedRank;
+        tr.className = ['', 'rank-1', 'rank-2', 'rank-3'][approvedRank] || '';
+      }
 
       const solveCells = (r.solves || []).map(s => {
         const t   = Timer.formatSolve(s);
         const cls = s.penalty === 'dnf' ? 'time-dnf' : s.penalty === 'plus2' ? 'time-plus' : '';
         return `<td class="${cls}">${t}</td>`;
       }).join('');
-
       const padding = Array(totalSolves - (r.solves || []).length).fill('<td>—</td>').join('');
-      const isOwn   = AppState.contestant && r.email === AppState.contestant.email;
+
+      const statusBadge = _statusBadge(status);
+
+      // Celda de acciones para el organizador
+      let actionCell = `<td>${statusBadge}</td>`;
+      if (isOrg) {
+        actionCell = `
+          <td style="white-space:nowrap;">
+            ${statusBadge}
+            <div style="display:flex;gap:.3rem;margin-top:.35rem;flex-wrap:wrap;">
+              ${status !== 'approved'
+                ? `<button class="approval-btn approve" onclick="Results.setStatus('${r.id}','approved')">✓ Aprobar</button>`
+                : ''}
+              ${status !== 'rejected'
+                ? `<button class="approval-btn reject"  onclick="Results.setStatus('${r.id}','rejected')">✕ Rechazar</button>`
+                : ''}
+              ${status !== 'pending'
+                ? `<button class="approval-btn pending" onclick="Results.setStatus('${r.id}','pending')">↺ Pendiente</button>`
+                : ''}
+            </div>
+          </td>`;
+      }
 
       tr.innerHTML = `
-        <td>${idx + 1}</td>
+        <td>${posCell}</td>
         <td>${r.name}${isOwn ? ' <span class="own-badge">tú</span>' : ''}</td>
         ${solveCells}${padding}
         <td class="time-best">${r.best || '—'}</td>
-        <td>${r.ao5 || '—'}</td>
+        <td>${r.ao5  || '—'}</td>
+        ${actionCell}
       `;
       if (isOwn) tr.classList.add('own-row');
       tbody.appendChild(tr);
     });
   }
 
-  // ── Exportar CSV ─────────────────────────────────────
+  function _statusBadge(status) {
+    const map = {
+      pending:  `<span class="status-badge pending">⏳ Pendiente</span>`,
+      approved: `<span class="status-badge approved">✓ Aprobado</span>`,
+      rejected: `<span class="status-badge rejected">✕ Rechazado</span>`,
+    };
+    return map[status] || map.pending;
+  }
+
+  // ── Cambiar status (organizador) ─────────────────────
+
+  async function setStatus(resultId, newStatus) {
+    if (!AppState.isOrganizer) return;
+    try {
+      await Storage.updateResultStatus(resultId, newStatus);
+      // El onSnapshot actualizará AppState.results automáticamente
+      UI.toast(newStatus === 'approved' ? '✓ Resultado aprobado' :
+               newStatus === 'rejected' ? '✕ Resultado rechazado' : '↺ Marcado como pendiente');
+    } catch (err) {
+      console.error('[Results] setStatus:', err);
+      UI.toast('⚠ Error al actualizar: ' + err.message);
+    }
+  }
+
+  // ── Exportar CSV (solo aprobados) ────────────────────
 
   function exportCSV() {
     if (!currentCat) return;
-    const catName = AppState.contest.categories[currentCat]?.name || currentCat;
+    const catName   = AppState.contest.categories[currentCat]?.name || currentCat;
     const mo3csv    = isMo3(currentCat);
     const totalCsv  = mo3csv ? 3 : 5;
     const statCsv   = mo3csv ? 'Mo3' : 'Ao5';
     const solveHdrs = Array.from({length: totalCsv}, (_, i) => `S${i+1}`);
-    const rows = [['#', 'Nombre', 'Email', ...solveHdrs, 'Mejor', statCsv]];
+    const rows = [['#', 'Nombre', 'Email', ...solveHdrs, 'Mejor', statCsv, 'Estado']];
 
     AppState.results
       .filter(r => r.category === currentCat)
@@ -153,7 +221,7 @@ const Results = (() => {
       .forEach((r, i) => {
         const solves = (r.solves || []).map(s => Timer.formatSolve(s));
         while (solves.length < totalCsv) solves.push('—');
-        rows.push([i + 1, r.name, r.email, ...solves, r.best || '—', r.ao5 || '—']);
+        rows.push([i + 1, r.name, r.email, ...solves, r.best || '—', r.ao5 || '—', r.status || 'pending']);
       });
 
     const csv  = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n');
@@ -164,5 +232,5 @@ const Results = (() => {
     link.click();
   }
 
-  return { submit, render, exportCSV };
+  return { submit, render, exportCSV, setStatus };
 })();

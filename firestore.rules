@@ -1,25 +1,8 @@
-// firestore.rules
-// ──────────────────────────────────────────────────────────────────
-// FIX: Soporte para múltiples organizadores mediante una función helper
-//      isOrganizer(). Para agregar más organizadores, solo hay que
-//      añadir su UID al array de la función.
-//
-// Cómo obtener el UID de un nuevo organizador:
-//   1. En Firebase Console → Authentication → Users
-//   2. Crea el usuario con email/password
-//   3. Copia el UID generado y agrégalo al array de isOrganizer()
-//
-// Se despliegan desde Firebase Console o con Firebase CLI:
-//   firebase deploy --only firestore:rules
-// ──────────────────────────────────────────────────────────────────
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Helper: lista de UIDs autorizados como organizadores ──────
-    // Para agregar un nuevo organizador: añadí su UID al array.
     function isOrganizer() {
       return request.auth != null && request.auth.uid in [
         "BEqkx94a5PdGb34ZQtoEALKfyi13",
@@ -27,42 +10,32 @@ service cloud.firestore {
       ];
     }
 
-    // ── Colección: contest ─────────────────────────────────────
-    // Solo organizadores pueden escribir.
-    // Todos pueden leer (para mostrar scrambles y nombre del contest).
-
     match /contest/{docId} {
       allow read: if true;
       allow write: if isOrganizer();
     }
 
-    // ── Colección: results ─────────────────────────────────────
-    // Cualquiera puede leer (tabla pública).
-    // Cualquiera puede crear UN resultado con los campos requeridos.
-    // Solo organizadores pueden borrar (reset).
-    // Nadie puede modificar un resultado ya enviado.
-
     match /results/{resultId} {
       allow read: if true;
 
       allow create: if
-        request.resource.data.keys().hasAll(['name', 'email', 'category', 'solves', 'ao5', 'ao5ms', 'timestamp'])
-        && request.resource.data.name     is string
-        && request.resource.data.email    is string
-        && request.resource.data.category is string
-        && request.resource.data.solves   is list
+        request.resource.data.keys().hasAll(['name', 'email', 'category', 'solves', 'ao5', 'ao5ms', 'timestamp', 'status'])
+        && request.resource.data.name      is string
+        && request.resource.data.email     is string
+        && request.resource.data.category  is string
+        && request.resource.data.solves    is list
         && request.resource.data.email.matches('.*@.*')
-        && request.resource.data.solves.size() <= 5;
+        && request.resource.data.solves.size() <= 5
+        // Competidores solo pueden crear con status 'pending'
+        && request.resource.data.status == 'pending';
+
+      // Solo el organizador puede cambiar el status
+      allow update: if isOrganizer()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['approved', 'rejected', 'pending'];
 
       allow delete: if isOrganizer();
-      allow update: if false;
     }
-
-    // ── Colección: participants ────────────────────────────────
-    // Cualquiera puede registrarse (crear).
-    // Solo organizadores pueden leer la lista completa (tiene emails).
-    // Solo organizadores pueden borrar (reset).
-    // Nadie puede modificar.
 
     match /participants/{participantId} {
       allow read:   if isOrganizer();
@@ -78,7 +51,6 @@ service cloud.firestore {
       allow update: if false;
     }
 
-    // ── Cualquier otra colección → denegado por defecto ────────
     match /{document=**} {
       allow read, write: if false;
     }
