@@ -45,8 +45,6 @@ const Organizer = (() => {
     _renderPanel();
   }
 
-  // Llamado desde main.js cada vez que llega un onSnapshot nuevo
-  // para actualizar el badge de pendientes sin recargar todo el panel.
   function refreshPendingBadge() {
     const count = AppState.results.filter(r => (r.status || 'pending') === 'pending').length;
     const badge = document.getElementById('pending-count-badge');
@@ -97,11 +95,14 @@ const Organizer = (() => {
     }
     try {
       await Storage.resetContest();
-      AppState.results     = [];
+      AppState.results      = [];
       AppState.participants = [];
+      AppState.contest      = { name: '', deadline: '', categories: {} };
       UI.closeModal('modal-reset');
-      _renderParticipants();
+      _renderPanel();
       refreshPendingBadge();
+      UI.updateContestBadge();
+      UI.refreshLandingActions();
       UI.toast('✓ Contest reseteado correctamente');
     } catch (err) {
       console.error('[Organizer] doReset:', err);

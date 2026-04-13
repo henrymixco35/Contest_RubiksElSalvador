@@ -65,6 +65,9 @@ const Storage = (() => {
     await Promise.all([
       ...rSnap.docs.map(d => FB.deleteDoc(d.ref)),
       ...pSnap.docs.map(d => FB.deleteDoc(d.ref)),
+      // También borra el documento de configuración del contest
+      // para que deje de aparecer como "cerrado" y vuelva al estado inicial
+      FB.deleteDoc(_contestRef()),
     ]);
   }
 
