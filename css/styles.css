@@ -105,13 +105,6 @@ header {
 }
 .logo span { color: var(--accent); }
 
-/* Banderita SV sutil junto al logo */
-.logo::before {
-  content: '🇸🇻';
-  margin-right: .5rem;
-  font-size: .9rem;
-}
-
 #header-actions { display: flex; align-items: center; gap: .75rem; }
 
 .header-badge {

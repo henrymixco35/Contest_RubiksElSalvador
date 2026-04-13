@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Rubik's El Salvador — Contest Online</title>
+  <link rel="icon" type="image/svg+xml" href="assets/logocontest.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Serif+Display:ital@0;1&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -73,7 +74,7 @@
   <div class="glow-orb"></div>
 
   <header>
-    <div class="logo">Comunidad Rubik's<span> El Salvador</span></div>
+    <div class="logo"><img src="assets/logocontest.svg" alt="Logo" style="height:24px;width:auto;vertical-align:middle;margin-right:.5rem;" /> Comunidad Rubik's<span> El Salvador</span></div>
     <div id="header-actions">
       <span class="header-badge" id="contest-badge" style="display:none;">● CONTEST ACTIVO</span>
       <button class="btn btn-outline btn-small" onclick="UI.showOrganizer()">Organizador</button>
@@ -115,6 +116,12 @@
         <label>Categoría a Competir</label>
         <select id="reg-category">
           <option value="">— Seleccioná una categoría —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>País</label>
+        <select id="reg-country">
+          <!-- Se llena dinámicamente desde registration.js -->
         </select>
       </div>
       <div class="field">

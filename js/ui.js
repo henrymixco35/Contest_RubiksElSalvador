@@ -38,6 +38,7 @@ const UI = (() => {
       return;
     }
     Registration.populateCategorySelect();
+    Registration.populateCountrySelect();
     showView('view-register');
   }
 

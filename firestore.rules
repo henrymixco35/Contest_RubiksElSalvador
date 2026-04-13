@@ -19,10 +19,11 @@ service cloud.firestore {
       allow read: if true;
 
       allow create: if
-        request.resource.data.keys().hasAll(['name', 'email', 'category', 'solves', 'ao5', 'ao5ms', 'timestamp', 'status'])
+        request.resource.data.keys().hasAll(['name', 'email', 'category', 'country', 'solves', 'ao5', 'ao5ms', 'timestamp', 'status'])
         && request.resource.data.name      is string
         && request.resource.data.email     is string
         && request.resource.data.category  is string
+        && request.resource.data.country   is string
         && request.resource.data.solves    is list
         && request.resource.data.email.matches('.*@.*')
         && request.resource.data.solves.size() <= 5
@@ -41,10 +42,11 @@ service cloud.firestore {
       allow read:   if isOrganizer();
 
       allow create: if
-        request.resource.data.keys().hasAll(['name', 'email', 'category', 'timestamp'])
+        request.resource.data.keys().hasAll(['name', 'email', 'category', 'country', 'timestamp'])
         && request.resource.data.name     is string
         && request.resource.data.email    is string
         && request.resource.data.category is string
+        && request.resource.data.country  is string
         && request.resource.data.email.matches('.*@.*');
 
       allow delete: if isOrganizer();
