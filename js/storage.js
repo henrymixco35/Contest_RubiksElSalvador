@@ -58,11 +58,13 @@ const Storage = (() => {
   }
 
   async function resetContest() {
-    const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-    const [rSnap, pSnap] = await Promise.all([FB.getDocs(_resultsCol()), FB.getDocs(_participantsCol())]);
+    const [rSnap, pSnap] = await Promise.all([
+      FB.getDocs(_resultsCol()),
+      FB.getDocs(_participantsCol()),
+    ]);
     await Promise.all([
-      ...rSnap.docs.map(d => deleteDoc(d.ref)),
-      ...pSnap.docs.map(d => deleteDoc(d.ref)),
+      ...rSnap.docs.map(d => FB.deleteDoc(d.ref)),
+      ...pSnap.docs.map(d => FB.deleteDoc(d.ref)),
     ]);
   }
 
