@@ -5,11 +5,35 @@
 
 const Results = (() => {
 
-  let currentCat = null;
+  let currentCat    = null;
+  let _isSubmitting = false;
+
   const MO3_CATS = new Set(['6x6', '7x7']);
   const isMo3 = (cat) => MO3_CATS.has(cat);
 
   async function submit() {
+    // Evitar envíos duplicados por clicks múltiples
+    if (_isSubmitting) return;
+
+    // Verificar que no haya ya un resultado enviado para este email+categoría
+    const dupCheck = AppState.results.some(
+      r => r.email === AppState.contestant.email &&
+           r.category === AppState.contestant.category
+    );
+    if (dupCheck) {
+      UI.toast('⚠ Ya enviaste resultados en esta categoría');
+      return;
+    }
+
+    _isSubmitting = true;
+
+    // Deshabilitar botón visualmente
+    const submitBtn = document.querySelector('#submit-section .btn-primary');
+    if (submitBtn) {
+      submitBtn.disabled    = true;
+      submitBtn.textContent = '⏳ Enviando…';
+    }
+
     const result = {
       name:      AppState.contestant.name,
       email:     AppState.contestant.email,
@@ -29,17 +53,27 @@ const Results = (() => {
     } catch (err) {
       console.error('[Results] saveResult:', err);
       UI.toast('⚠ Error al guardar resultados. Intentá de nuevo.');
+      _isSubmitting = false;
+      if (submitBtn) {
+        submitBtn.disabled    = false;
+        submitBtn.textContent = '✓ Enviar Resultados';
+      }
       return;
     }
 
     AppState.results.push(result);
     AppState.lastOwnResult = result;
 
+    // Limpiar sesión guardada — ya se envió exitosamente
+    SessionStore.clear();
+
     const catName = AppState.contest.categories[AppState.contestant.category]?.name || '';
     document.getElementById('success-msg').textContent =
       `${result.name} — ${catName} — ${Timer.getStatLabel()}: ${result.ao5}`;
 
     document.getElementById('modal-success').classList.add('open');
+
+    // Mantener flag true para impedir reenvíos desde el modal
   }
 
   function render(visibleCats) {
@@ -205,5 +239,8 @@ const Results = (() => {
     link.click();
   }
 
-  return { submit, render, exportCSV, setStatus };
+  // Resetear flag al inicio de una nueva sesión de timer
+  function resetSubmitFlag() { _isSubmitting = false; }
+
+  return { submit, render, exportCSV, setStatus, resetSubmitFlag };
 })();

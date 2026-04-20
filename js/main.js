@@ -21,6 +21,8 @@
   _showLoader(false);
   UI.refreshLandingActions();
 
+  SessionStore.tryRestore();
+
   AppState._unsubscribeResults = Storage.subscribeResults((freshResults) => {
     AppState.results = freshResults;
     if (AppState.isOrganizer) Organizer.refreshPendingBadge();
@@ -44,11 +46,25 @@
     }
   });
 
+  // ── Teclado ──────────────────────────────────────────
   document.addEventListener('keydown', (e) => {
     if (!document.getElementById('view-contest').classList.contains('active')) return;
-    if (e.code !== 'Space' || e.repeat) return;
-    e.preventDefault();
-    Timer.handlePress();
+    if (e.repeat) return;
+
+    if (e.code === 'Space') {
+      e.preventDefault();
+      Timer.handlePress();
+      return;
+    }
+
+    if (AppState.timerState === 'running') {
+      const ignored = ['ShiftLeft','ShiftRight','ControlLeft','ControlRight',
+                       'AltLeft','AltRight','MetaLeft','MetaRight','CapsLock','Tab'];
+      if (!ignored.includes(e.code)) {
+        e.preventDefault();
+        Timer.handlePress(); 
+      }
+    }
   });
 
   document.addEventListener('keyup', (e) => {
@@ -58,6 +74,7 @@
     Timer.handleRelease();
   });
 
+  // ── Touch ─────────────────────────────────────────────
   const contestMain      = document.getElementById('contest-main');
   const SCROLL_THRESHOLD = 10;
   let touchStartY = 0, touchStartX = 0, touchMoved = false;

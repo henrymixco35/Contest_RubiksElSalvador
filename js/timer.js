@@ -49,8 +49,10 @@ const Timer = (() => {
   /* ── Init ───────────────────────────────────────────── */
 
   function init() {
-    AppState.solves           = [];
-    AppState.currentSolve     = 0;
+    // Si hay solves pre-cargados desde sessionStorage, respetarlos
+    if (!AppState.solves)       AppState.solves       = [];
+    if (!AppState.currentSolve) AppState.currentSolve = 0;
+
     AppState.scrambleRevealed = false;
     AppState.currentPenalty   = null;
     AppState.timerState       = 'idle';
@@ -59,6 +61,12 @@ const Timer = (() => {
 
     _clearInspection();
     _clearHold();
+
+    // Resetear flag de envío duplicado
+    Results.resetSubmitFlag();
+
+    // Activar clase no-scroll en body
+    document.body.classList.add('in-contest');
 
     document.getElementById('sb-name').textContent = AppState.contestant.name;
     const catData = AppState.contest.categories[AppState.contestant.category];
@@ -78,6 +86,15 @@ const Timer = (() => {
     if (ao5LabelEl) ao5LabelEl.textContent = getStatLabel();
     const totalEl = document.getElementById('total-solve-num');
     if (totalEl) totalEl.textContent = _totalSolves();
+
+    // Si se está restaurando una sesión con solves ya hechos
+    if (AppState.currentSolve >= _totalSolves()) {
+      _showFinalSummary();
+    } else {
+      // Actualizar el badge y el scramble al solve correcto
+      document.getElementById('solve-badge').textContent = `SOLVE ${AppState.currentSolve + 1}`;
+      document.getElementById('current-solve-num').textContent = AppState.currentSolve + 1;
+    }
   }
 
   /* ── Handlers principales ───────────────────────────── */
@@ -175,6 +192,8 @@ const Timer = (() => {
     document.getElementById('review-time-display').textContent = formatSolve(solve);
     _updateReviewBtns(solve);
     _renderSolveList();
+    // Guardar cambio de penalidad en sesión
+    SessionStore.save();
   }
 
   function _updateReviewBtns(solve) {
@@ -219,6 +238,16 @@ const Timer = (() => {
     AppState.timerState = 'idle';
     reviewMode  = false;
     reviewIndex = null;
+
+    // Limpiar sesión al abandonar conscientemente
+    SessionStore.clear();
+    AppState.solves       = [];
+    AppState.currentSolve = 0;
+    AppState.contestant   = null;
+
+    // Quitar clase no-scroll
+    document.body.classList.remove('in-contest');
+
     UI.closeModal('modal-abandon');
     UI.showView('view-landing');
   }
@@ -270,6 +299,7 @@ const Timer = (() => {
         AppState.scrambleRevealed = false;
         AppState.timerState       = 'idle';
         _renderSolveList();
+        SessionStore.save();
         if (AppState.currentSolve >= _totalSolves()) {
           _showFinalSummary();
         } else {
@@ -355,7 +385,7 @@ const Timer = (() => {
     const disp = document.getElementById('timer-display');
     disp.className   = 'timer-display running';
     disp.textContent = '0.00';
-    document.getElementById('timer-hint').textContent = 'Tocá para detener';
+    document.getElementById('timer-hint').textContent = 'Tocá para detener · Cualquier tecla detiene';
 
     const cubeWrap = document.getElementById('cube-preview-wrap');
     if (cubeWrap) cubeWrap.style.display = 'none';
@@ -399,6 +429,9 @@ const Timer = (() => {
     inspectionPenalty         = null;
 
     _renderSolveList();
+
+    // Guardar progreso en sesión después de cada solve
+    SessionStore.save();
 
     if (AppState.currentSolve >= _totalSolves()) { _showFinalSummary(); return; }
 
@@ -559,6 +592,11 @@ const Timer = (() => {
     disp.textContent = '✓';
     document.getElementById('solve-badge').textContent = '¡COMPLETADO!';
     document.getElementById('timer-hint').textContent  = '';
+
+    // Restaurar scroll para poder ver el resumen y el botón de enviar
+    document.body.classList.remove('in-contest');
+    document.getElementById('view-contest').style.height   = '';
+    document.getElementById('view-contest').style.overflow = '';
 
     const summary = document.getElementById('final-summary');
     summary.innerHTML = `

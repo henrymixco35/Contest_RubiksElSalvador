@@ -9,6 +9,14 @@ const UI = (() => {
   function showView(id) {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById(id).classList.add('active');
+
+    // Quitar clase no-scroll si salimos del timer
+    if (id !== 'view-contest') {
+      document.body.classList.remove('in-contest');
+      // Restaurar overflow por si acaso
+      document.body.style.overflow = '';
+    }
+
     if (id !== 'view-results') {
       const li = document.getElementById('live-indicator');
       if (li) li.style.display = 'none';
