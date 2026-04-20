@@ -10,10 +10,8 @@ const UI = (() => {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById(id).classList.add('active');
 
-    // Quitar clase no-scroll si salimos del timer
     if (id !== 'view-contest') {
       document.body.classList.remove('in-contest');
-      // Restaurar overflow por si acaso
       document.body.style.overflow = '';
     }
 
@@ -31,6 +29,24 @@ const UI = (() => {
     if (!toggle || !inner) return;
     const isOpen = inner.classList.toggle('open');
     toggle.classList.toggle('open', isOpen);
+    const arrow = toggle.querySelector('.sidebar-toggle-arrow');
+    if (arrow) arrow.textContent = isOpen ? '▴' : '▾';
+  }
+
+  /* Llamado desde Timer.init() para resetear estado del sidebar en móvil */
+  function resetSidebar() {
+    const toggle = document.getElementById('sidebar-toggle');
+    const inner  = document.getElementById('sidebar-inner');
+    if (!toggle || !inner) return;
+    /* En móvil empieza cerrado; en desktop siempre visible */
+    if (window.innerWidth <= 700) {
+      inner.classList.remove('open');
+      toggle.classList.remove('open');
+      const arrow = toggle.querySelector('.sidebar-toggle-arrow');
+      if (arrow) arrow.textContent = '▾';
+    } else {
+      inner.classList.add('open');
+    }
   }
 
   /* ── Landing ─────────────────────────────────────────── */
@@ -180,7 +196,7 @@ const UI = (() => {
   }
 
   return {
-    showView, toggleSidebar,
+    showView, toggleSidebar, resetSidebar,
     showRegistration,
     showEmailLogin, submitEmailLogin,
     showResults, showOrganizer,

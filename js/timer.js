@@ -42,14 +42,12 @@ const Timer = (() => {
   let holdReady   = false;
   let isHolding   = false;
 
-  // Estado de revisión de solve anterior
   let reviewMode  = false;
   let reviewIndex = null;
 
   /* ── Init ───────────────────────────────────────────── */
 
   function init() {
-    // Si hay solves pre-cargados desde sessionStorage, respetarlos
     if (!AppState.solves)       AppState.solves       = [];
     if (!AppState.currentSolve) AppState.currentSolve = 0;
 
@@ -62,15 +60,16 @@ const Timer = (() => {
     _clearInspection();
     _clearHold();
 
-    // Resetear flag de envío duplicado
     Results.resetSubmitFlag();
 
-    // Activar clase no-scroll en body
     document.body.classList.add('in-contest');
 
     document.getElementById('sb-name').textContent = AppState.contestant.name;
     const catData = AppState.contest.categories[AppState.contestant.category];
     document.getElementById('sb-cat').textContent = catData ? catData.name : AppState.contestant.category;
+
+    /* Resetear sidebar al estado correcto según viewport */
+    UI.resetSidebar();
 
     _renderSolveList();
     _resetDisplay();
@@ -87,11 +86,9 @@ const Timer = (() => {
     const totalEl = document.getElementById('total-solve-num');
     if (totalEl) totalEl.textContent = _totalSolves();
 
-    // Si se está restaurando una sesión con solves ya hechos
     if (AppState.currentSolve >= _totalSolves()) {
       _showFinalSummary();
     } else {
-      // Actualizar el badge y el scramble al solve correcto
       document.getElementById('solve-badge').textContent = `SOLVE ${AppState.currentSolve + 1}`;
       document.getElementById('current-solve-num').textContent = AppState.currentSolve + 1;
     }
@@ -171,14 +168,12 @@ const Timer = (() => {
     _updateReviewBtns(solve);
     panel.style.display = 'flex';
 
-    // Mostrar cubo del solve revisado
     const cubeWrap = document.getElementById('cube-preview-wrap');
     if (cubeWrap) {
       cubeWrap.style.display = '';
       _renderCubePreview(AppState.contestant.category, scr);
     }
 
-    // Atenuar el timer, ocultar controls
     document.getElementById('next-scramble-wrap').style.display = 'none';
     const timerInner = document.getElementById('timer-area-inner');
     if (timerInner) timerInner.style.opacity = '0.3';
@@ -192,7 +187,6 @@ const Timer = (() => {
     document.getElementById('review-time-display').textContent = formatSolve(solve);
     _updateReviewBtns(solve);
     _renderSolveList();
-    // Guardar cambio de penalidad en sesión
     SessionStore.save();
   }
 
@@ -239,13 +233,11 @@ const Timer = (() => {
     reviewMode  = false;
     reviewIndex = null;
 
-    // Limpiar sesión al abandonar conscientemente
     SessionStore.clear();
     AppState.solves       = [];
     AppState.currentSolve = 0;
     AppState.contestant   = null;
 
-    // Quitar clase no-scroll
     document.body.classList.remove('in-contest');
 
     UI.closeModal('modal-abandon');
@@ -429,8 +421,6 @@ const Timer = (() => {
     inspectionPenalty         = null;
 
     _renderSolveList();
-
-    // Guardar progreso en sesión después de cada solve
     SessionStore.save();
 
     if (AppState.currentSolve >= _totalSolves()) { _showFinalSummary(); return; }
@@ -558,7 +548,6 @@ const Timer = (() => {
       if (done) {
         time.className   = 'si-time' + (solve.penalty === 'dnf' ? ' dnf' : '');
         time.textContent = formatSolve(solve);
-        // pequeño ícono de edición
         const editIcon = document.createElement('span');
         editIcon.textContent  = ' ✎';
         editIcon.style.cssText = 'font-size:.55rem;color:var(--muted);opacity:.5;';
@@ -593,7 +582,6 @@ const Timer = (() => {
     document.getElementById('solve-badge').textContent = '¡COMPLETADO!';
     document.getElementById('timer-hint').textContent  = '';
 
-    // Restaurar scroll para poder ver el resumen y el botón de enviar
     document.body.classList.remove('in-contest');
     document.getElementById('view-contest').style.height   = '';
     document.getElementById('view-contest').style.overflow = '';
