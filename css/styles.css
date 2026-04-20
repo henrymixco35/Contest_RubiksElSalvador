@@ -40,7 +40,6 @@ body {
   position: relative;
 }
 
-/* Patrón de fondo */
 body::before {
   content: '';
   position: fixed;
@@ -71,6 +70,12 @@ body::before {
   display: flex;
   flex-direction: column;
 }
+
+/* ── Animaciones ─────────────────────────────────────── */
+@keyframes badgePulse { 0%,100% { opacity: 1 } 50% { opacity: .65 } }
+@keyframes livePulse  { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
+@keyframes fadeUp     { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes spin       { to { transform: rotate(360deg) } }
 
 /* ── Header ──────────────────────────────────────────── */
 header {
@@ -108,12 +113,6 @@ header {
   padding: .2rem .55rem;
   animation: badgePulse 2.5s ease-in-out infinite;
 }
-
-/* ── Animaciones compartidas ─────────────────────────── */
-@keyframes badgePulse { 0%,100% { opacity: 1 } 50% { opacity: .65 } }
-@keyframes livePulse  { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
-@keyframes fadeUp     { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: translateY(0) } }
-@keyframes spin       { to { transform: rotate(360deg) } }
 
 /* ── Vistas ──────────────────────────────────────────── */
 .view { display: none; flex: 1; }
@@ -309,7 +308,9 @@ header {
   min-height: calc(100dvh - 57px);
 }
 
-/* ── Sidebar ─────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════
+   SIDEBAR — desktop base (siempre visible, sin toggle)
+   ════════════════════════════════════════════════════════ */
 .contest-sidebar {
   border-right: 1px solid var(--border);
   background: var(--bg2);
@@ -319,7 +320,8 @@ header {
   gap: .6rem;
 }
 
-/* El inner scrollea, el botón de abandonar siempre visible */
+/* En desktop: inner toma el espacio disponible y el botón
+   de abandonar queda anclado al fondo */
 .sidebar-inner {
   display: flex;
   flex-direction: column;
@@ -328,6 +330,9 @@ header {
   min-height: 0;
   overflow-y: auto;
 }
+
+.sidebar-toggle     { display: none; }   /* oculto en desktop */
+.mobile-abandon-btn { display: none; }   /* oculto en desktop */
 
 .sidebar-label {
   font-family: var(--mono);
@@ -339,17 +344,9 @@ header {
 }
 .sidebar-label:first-child { margin-top: 0; }
 
-.sidebar-info {
-  font-weight: 600;
-  font-size: .95rem;
-  word-break: break-word;
-}
+.sidebar-info { font-weight: 600; font-size: .95rem; word-break: break-word; }
 
-.solve-list {
-  display: flex;
-  flex-direction: column;
-  gap: .35rem;
-}
+.solve-list { display: flex; flex-direction: column; gap: .35rem; }
 
 .solve-item {
   display: flex;
@@ -366,9 +363,9 @@ header {
 .solve-item.current { border-color: var(--accent); background: rgba(58,123,213,.08); }
 .solve-item.done:hover { border-color: var(--border2); background: var(--surface2); }
 
-.si-num            { color: var(--muted); }
-.si-time           { font-weight: 700; }
-.si-time.dnf       { color: var(--accent2); }
+.si-num      { color: var(--muted); }
+.si-time     { font-weight: 700; }
+.si-time.dnf { color: var(--accent2); }
 
 .ao-display {
   margin-top: .4rem;
@@ -388,6 +385,8 @@ header {
 .ao-row span:first-child { color: var(--muted); }
 .ao-row span:last-child  { color: var(--accent3); font-weight: 700; }
 
+/* El botón de abandonar está FUERA del sidebar-inner para
+   no ser afectado por overflow/flex y siempre estar visible */
 .sidebar-bottom { padding-top: 1.2rem; flex-shrink: 0; }
 
 /* ── Contest main ────────────────────────────────────── */
@@ -463,12 +462,12 @@ header {
   text-align: center;
 }
 
-.timer-display.running              { color: var(--accent4); }
-.timer-display.stopped              { color: var(--text); }
-.timer-display.dnf                  { color: var(--accent2); }
-.timer-display.inspection           { color: var(--text); }
-.timer-display.inspection.warn      { color: var(--accent3); }
-.timer-display.inspection.plus2-warn{ color: var(--accent2); }
+.timer-display.running               { color: var(--accent4); }
+.timer-display.stopped               { color: var(--text); }
+.timer-display.dnf                   { color: var(--accent2); }
+.timer-display.inspection            { color: var(--text); }
+.timer-display.inspection.warn       { color: var(--accent3); }
+.timer-display.inspection.plus2-warn { color: var(--accent2); }
 .timer-display.inspection.hold-yellow{ color: var(--accent3); }
 .timer-display.inspection.hold-green { color: var(--accent4); }
 
@@ -968,13 +967,11 @@ tbody tr:hover td      { background: var(--surface2); }
 ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 
 /* ══════════════════════════════════════════════════════
-   MÓVIL — sidebar colapsable bajo el timer
+   MÓVIL ≤ 700px — sidebar colapsable BAJO el timer
    ══════════════════════════════════════════════════════ */
-
-.sidebar-toggle     { display: none; }
-.mobile-abandon-btn { display: none; }
-
 @media (max-width: 700px) {
+
+  /* Layout vertical: timer arriba, sidebar abajo */
   .contest-layout {
     display: flex !important;
     flex-direction: column !important;
@@ -988,18 +985,23 @@ tbody tr:hover td      { background: var(--surface2); }
     justify-content: flex-start;
   }
 
+  /* Sidebar como panel colapsable al fondo */
   .contest-sidebar {
     order: 2;
     background: var(--surface);
     border-top: 1px solid var(--border);
     border-right: none !important;
+    /* Sin padding aquí: el toggle y el inner lo manejan */
     padding: 0 !important;
     gap: 0 !important;
-    overflow: visible;
+    /* No fijar altura; crecer según contenido */
+    height: auto !important;
+    overflow: visible !important;
   }
 
+  /* Toggle: visible en móvil */
   .sidebar-toggle {
-    display: flex;
+    display: flex !important;
     align-items: center;
     justify-content: space-between;
     padding: .85rem 1.2rem;
@@ -1015,23 +1017,31 @@ tbody tr:hover td      { background: var(--surface2); }
     transition: color .2s;
   }
   .sidebar-toggle:hover,
-  .sidebar-toggle.open  { color: var(--accent); }
-  .sidebar-toggle.open  { border-bottom-color: var(--border); }
+  .sidebar-toggle.open { color: var(--accent); }
+  .sidebar-toggle.open { border-bottom-color: var(--border); }
 
   .sidebar-toggle-arrow { transition: transform .25s; font-size: .7rem; }
   .sidebar-toggle.open .sidebar-toggle-arrow { transform: rotate(180deg); }
 
+  /* Inner: oculto por defecto, visible cuando toggle.open */
   .sidebar-inner {
-    display: none;
-    padding: 1rem 1.2rem 1.5rem;
-    gap: .4rem;
-    flex-direction: column;
-    flex: unset;
+    display: none !important;      /* oculto base */
+    flex: unset !important;
+    min-height: unset !important;
     overflow-y: auto;
-    max-height: 40dvh;
+    max-height: 45dvh;
+    padding: 1rem 1.2rem 1.5rem;
+    gap: .5rem;
+    flex-direction: column;
   }
-  .sidebar-inner.open { display: flex; }
+  .sidebar-inner.open {
+    display: flex !important;      /* visible cuando abierto */
+  }
 
+  /* Botón abandonar: siempre visible, DENTRO del inner en móvil */
+  .sidebar-bottom { display: block; }
+
+  /* Solves en fila */
   .solve-list {
     flex-direction: row !important;
     flex-wrap: wrap;
@@ -1046,7 +1056,7 @@ tbody tr:hover td      { background: var(--surface2); }
     justify-content: center;
   }
 
-  .sidebar-bottom { display: none; }
+  /* Botón abandonar flotante en el main (arriba derecha) */
   .mobile-abandon-btn {
     display: flex !important;
     justify-content: flex-end;
@@ -1055,84 +1065,58 @@ tbody tr:hover td      { background: var(--surface2); }
     margin-bottom: .25rem;
   }
 
-  .timer-display   { font-size: clamp(3rem, 18vw, 6rem); }
+  .timer-display    { font-size: clamp(3rem, 18vw, 6rem); }
   .scramble-display,
-  .submit-section  { max-width: 100%; }
+  .submit-section   { max-width: 100%; }
 
   .two-col-grid { grid-template-columns: 1fr; }
 }
 
 /* ══════════════════════════════════════════════════════
-   NO-SCROLL en la vista del timer (clase in-contest)
+   NO-SCROLL en la vista del timer — clase in-contest
+   Solo se aplica en desktop (> 700px)
    ══════════════════════════════════════════════════════ */
+@media (min-width: 701px) {
+  body.in-contest {
+    overflow: hidden;
+    height: 100dvh;
+  }
 
-body.in-contest {
-  overflow: hidden;
-  height: 100dvh;
-}
+  body.in-contest #app {
+    height: 100dvh;
+    overflow: hidden;
+  }
 
-body.in-contest #app {
-  height: 100dvh;
-  overflow: hidden;
-}
-
-body.in-contest #view-contest {
-  height: calc(100dvh - 57px);
-  overflow: hidden;
-  flex: 0 0 auto;
-}
-
-body.in-contest .contest-layout {
-  height: 100%;
-  overflow: hidden;
-}
-
-/* Desktop: sidebar como flex column, inner scrollea, botón siempre visible */
-body.in-contest .contest-sidebar {
-  height: 100%;
-  overflow: visible;
-  display: flex;
-  flex-direction: column;
-}
-
-body.in-contest .sidebar-inner {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-body.in-contest .contest-main {
-  height: 100%;
-  overflow: hidden;
-  justify-content: center;
-}
-
-/* Móvil con in-contest */
-@media (max-width: 700px) {
   body.in-contest #view-contest {
-    display: flex;
-    flex-direction: column;
+    height: calc(100dvh - 57px);
+    overflow: hidden;
+    flex: 0 0 auto;
   }
 
   body.in-contest .contest-layout {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
   }
 
-  body.in-contest .contest-main {
+  /* Sidebar: flex column para que el botón quede anclado */
+  body.in-contest .contest-sidebar {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  /* El inner scrollea, el botón de abandonar no */
+  body.in-contest .sidebar-inner {
     flex: 1;
+    overflow-y: auto;
     min-height: 0;
   }
 
-  body.in-contest .contest-sidebar {
-    flex: 0 0 auto;
-    height: auto;
-  }
-
-  body.in-contest .sidebar-inner {
-    flex: unset;
-    min-height: unset;
+  body.in-contest .contest-main {
+    height: 100%;
+    overflow: hidden;
+    justify-content: center;
   }
 }
 
