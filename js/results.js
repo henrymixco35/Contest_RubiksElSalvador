@@ -575,7 +575,7 @@ const Results = (() => {
   </section>
 
   <footer class="report-footer">
-    <span>Comunidad Rubik's El Salvador · contestrubikelsalvador.web.app</span>
+    <span>Comunidad Rubik's El Salvador</span>
     <span>${exportDate}</span>
   </footer>
 
