@@ -1,5 +1,9 @@
 /**
  * config.js
+ * ─────────────────────────────────────────────────────
+ * Constantes y estado global de la aplicación.
+ * Los datos se cargan de Firestore en main.js (async).
+ * La autenticación del organizador la maneja Firebase Auth.
  */
 
 // ── Lista de categorías WCA soportadas ────────────────
@@ -42,5 +46,6 @@ const AppState = {
   scrambleRevealed: false,
   currentPenalty:   null,
 
-  _unsubscribeResults: null,
+  _unsubscribeResults:      null,
+  _unsubscribeParticipants: null,
 };

@@ -341,6 +341,7 @@ const Organizer = (() => {
     login, logout, showPanel,
     saveContest, confirmReset, doReset,
     refreshPendingBadge,
+    refreshParticipantsTable: _renderParticipants,
     showLogs, _renderLogs,
   };
 })();

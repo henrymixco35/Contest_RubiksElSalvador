@@ -46,11 +46,26 @@
   FB.onAuthStateChanged(auth, (user) => {
     if (user) {
       AppState.isOrganizer = true;
+
+      if (!AppState._unsubscribeParticipants) {
+        AppState._unsubscribeParticipants = Storage.subscribeParticipants((freshParticipants) => {
+          AppState.participants = freshParticipants;
+          if (document.getElementById('view-organizer').classList.contains('active')
+              && document.getElementById('org-panel').style.display !== 'none') {
+            Organizer.refreshParticipantsTable();
+          }
+        });
+      }
+
       if (document.getElementById('view-organizer').classList.contains('active')) {
         Organizer.showPanel();
       }
     } else {
       AppState.isOrganizer = false;
+      if (AppState._unsubscribeParticipants) {
+        AppState._unsubscribeParticipants();
+        AppState._unsubscribeParticipants = null;
+      }
     }
   });
 

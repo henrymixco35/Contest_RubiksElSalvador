@@ -66,7 +66,7 @@ const Storage = (() => {
     });
     return ref.id;
   }
-
+  
   async function updateParticipantSession(email, category, data) {
     try {
       const q    = FB.query(
@@ -88,6 +88,14 @@ const Storage = (() => {
       FB.collection(db, 'results'),
       snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
       err  => console.error('[Storage] subscribeResults:', err),
+    );
+  }
+
+  function subscribeParticipants(callback) {
+    return FB.onSnapshot(
+      FB.collection(db, 'participants'),
+      snap => callback(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      err  => console.error('[Storage] subscribeParticipants:', err),
     );
   }
 
@@ -136,7 +144,7 @@ const Storage = (() => {
     loadContest, saveContest,
     loadResults, saveResult, updateResultStatus,
     loadParticipants, saveParticipant, updateParticipantSession,
-    subscribeResults,
+    subscribeResults, subscribeParticipants,
     loadLogs, clearOldLogs,
     resetContest,
   };
