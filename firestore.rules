@@ -10,16 +10,21 @@ service cloud.firestore {
       ];
     }
 
+    // ── Contest config ────────────────────────────────
     match /contest/{docId} {
-      allow read: if true;
+      allow read:  if true;
       allow write: if isOrganizer();
     }
 
+    // ── Results ───────────────────────────────────────
     match /results/{resultId} {
       allow read: if true;
 
       allow create: if
-        request.resource.data.keys().hasAll(['name', 'email', 'category', 'country', 'solves', 'ao5', 'ao5ms', 'timestamp', 'status'])
+        request.resource.data.keys().hasAll([
+          'name', 'email', 'category', 'country',
+          'solves', 'ao5', 'ao5ms', 'timestamp', 'status'
+        ])
         && request.resource.data.name      is string
         && request.resource.data.email     is string
         && request.resource.data.category  is string
@@ -32,27 +37,57 @@ service cloud.firestore {
 
       // Solo el organizador puede cambiar el status
       allow update: if isOrganizer()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.diff(resource.data)
+             .affectedKeys().hasOnly(['status'])
         && request.resource.data.status in ['approved', 'rejected', 'pending'];
 
       allow delete: if isOrganizer();
     }
 
+    // ── Participants ──────────────────────────────────
     match /participants/{participantId} {
-      allow read:   if isOrganizer();
+      allow read: if isOrganizer();
 
       allow create: if
-        request.resource.data.keys().hasAll(['name', 'email', 'category', 'country', 'timestamp'])
+        request.resource.data.keys().hasAll([
+          'name', 'email', 'category', 'country', 'timestamp'
+        ])
         && request.resource.data.name     is string
         && request.resource.data.email    is string
         && request.resource.data.category is string
         && request.resource.data.country  is string
         && request.resource.data.email.matches('.*@.*');
 
+      // El competidor puede actualizar SOLO los campos de sesión del timer.
+      // El organizador puede actualizar cualquier campo.
+      allow update: if isOrganizer()
+        || (
+          request.resource.data.diff(resource.data)
+            .affectedKeys()
+            .hasOnly(['timerMinutes', 'pageReloads', 'timerLastSeen',
+                      'completedAt', 'abandonedAt'])
+          // Verificar que el email no cambia (el competidor solo toca su propio doc)
+          && resource.data.email == request.resource.data.email
+        );
+
       allow delete: if isOrganizer();
+    }
+
+    // ── Logs ──────────────────────────────────────────
+    // Cualquier usuario (autenticado o no) puede crear logs.
+    // Solo el organizador puede leer y borrar.
+    match /logs/{logId} {
+      allow create: if
+        request.resource.data.keys().hasAll(['level', 'event', 'timestamp'])
+        && request.resource.data.level in ['info', 'warn', 'error']
+        && request.resource.data.event is string
+        && request.resource.data.timestamp is string;
+
+      allow read, delete: if isOrganizer();
       allow update: if false;
     }
 
+    // ── Catch-all: negar todo lo demás ───────────────
     match /{document=**} {
       allow read, write: if false;
     }

@@ -22,7 +22,6 @@ const UI = (() => {
   }
 
   /* ── Sidebar móvil ───────────────────────────────────── */
-
   function toggleSidebar() {
     const toggle = document.getElementById('sidebar-toggle');
     const inner  = document.getElementById('sidebar-inner');
@@ -33,12 +32,10 @@ const UI = (() => {
     if (arrow) arrow.textContent = isOpen ? '▴' : '▾';
   }
 
-  /* Llamado desde Timer.init() para resetear estado del sidebar en móvil */
   function resetSidebar() {
     const toggle = document.getElementById('sidebar-toggle');
     const inner  = document.getElementById('sidebar-inner');
     if (!toggle || !inner) return;
-    /* En móvil empieza cerrado; en desktop siempre visible */
     if (window.innerWidth <= 700) {
       inner.classList.remove('open');
       toggle.classList.remove('open');
@@ -50,7 +47,6 @@ const UI = (() => {
   }
 
   /* ── Landing ─────────────────────────────────────────── */
-
   function showRegistration() {
     const cats = AppState.contest.categories || {};
     if (Object.keys(cats).length === 0) {
@@ -66,10 +62,9 @@ const UI = (() => {
     showView('view-register');
   }
 
-  /* ── Login por email (competidor que ya participó) ───── */
-
+  /* ── Login por email ─────────────────────────────────── */
   function showEmailLogin() {
-    document.getElementById('email-login-input').value = '';
+    document.getElementById('email-login-input').value       = '';
     document.getElementById('email-login-error').textContent = '';
     document.getElementById('modal-email-login').classList.add('open');
     setTimeout(() => document.getElementById('email-login-input').focus(), 100);
@@ -101,7 +96,6 @@ const UI = (() => {
   }
 
   /* ── Resultados ──────────────────────────────────────── */
-
   function showResults() {
     let visibleCats = null;
 
@@ -128,7 +122,6 @@ const UI = (() => {
   }
 
   /* ── Organizador ─────────────────────────────────────── */
-
   function showOrganizer() {
     if (AppState.isOrganizer) {
       showView('view-organizer');
@@ -139,7 +132,6 @@ const UI = (() => {
   }
 
   /* ── Modales ─────────────────────────────────────────── */
-
   function closeModal(id) {
     document.getElementById(id).classList.remove('open');
   }
@@ -149,7 +141,6 @@ const UI = (() => {
   }
 
   /* ── Toast ───────────────────────────────────────────── */
-
   function toast(msg) {
     const el = document.getElementById('toast');
     el.textContent = msg;
@@ -158,8 +149,7 @@ const UI = (() => {
     toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
   }
 
-  /* ── Badge ───────────────────────────────────────────── */
-
+  /* ── Badge de contest ────────────────────────────────── */
   function updateContestBadge() {
     const hasCats  = Object.keys(AppState.contest.categories || {}).length > 0;
     const badge    = document.getElementById('contest-badge');

@@ -1,6 +1,5 @@
 /**
  * registration.js
- *
  */
 
 const Registration = (() => {
@@ -49,7 +48,7 @@ const Registration = (() => {
     const sel = document.getElementById('reg-category');
     sel.innerHTML = '<option value="">— Seleccioná una categoría —</option>';
     Object.entries(AppState.contest.categories || {}).forEach(([id, cat]) => {
-      const opt = document.createElement('option');
+      const opt       = document.createElement('option');
       opt.value       = id;
       opt.textContent = cat.name;
       sel.appendChild(opt);
@@ -61,7 +60,7 @@ const Registration = (() => {
     if (!sel) return;
     sel.innerHTML = '';
     COUNTRIES.forEach(country => {
-      const opt = document.createElement('option');
+      const opt       = document.createElement('option');
       opt.value       = country;
       opt.textContent = country;
       if (country === 'El Salvador') opt.selected = true;
@@ -81,10 +80,10 @@ const Registration = (() => {
     const country     = document.getElementById('reg-country').value;
     const suggestions = document.getElementById('reg-suggestions').value.trim();
 
-    if (!name)                          { UI.toast('⚠ Ingresá tu nombre completo'); return; }
+    if (!name)                          { UI.toast('⚠ Ingresá tu nombre completo');         return; }
     if (!email || !email.includes('@')) { UI.toast('⚠ El correo electrónico no es válido'); return; }
-    if (!category)                      { UI.toast('⚠ Seleccioná una categoría'); return; }
-    if (!country)                       { UI.toast('⚠ Seleccioná tu país'); return; }
+    if (!category)                      { UI.toast('⚠ Seleccioná una categoría');            return; }
+    if (!country)                       { UI.toast('⚠ Seleccioná tu país');                  return; }
 
     const alreadySubmitted = AppState.results.some(
       r => r.email === email && r.category === category
@@ -96,22 +95,50 @@ const Registration = (() => {
 
     AppState.contestant = { name, email, category, country, suggestions };
 
+    AppState.solves       = [];
+    AppState.currentSolve = 0;
+    AppState.currentPenalty = null;
+
     const alreadyParticipant = AppState.participants.some(
       p => p.email === email && p.category === category
     );
     if (!alreadyParticipant) {
       try {
-        const participant = { name, email, category, country, suggestions, timestamp: new Date().toISOString() };
+        const participant = {
+          name,
+          email,
+          category,
+          country,
+          suggestions,
+          timestamp:      new Date().toISOString(),
+          timerEnteredAt: new Date().toISOString(),
+          pageReloads:    0,                         
+        };
         await Storage.saveParticipant(participant);
         AppState.participants.push(participant);
       } catch (e) {
         console.error('[Registration] saveParticipant:', e);
+        Logger.error('save_participant_failed', {
+          errorMessage: e?.message || String(e),
+          category,
+        });
       }
     }
 
-    Timer.init();
+    Logger.info('contestant_registered', {
+      category,
+      country,
+    });
+
+    Timer.init(false);
     UI.showView('view-contest');
   }
 
-  return { populateCategorySelect, populateCountrySelect, submit, isContestClosed, COUNTRIES };
+  return {
+    populateCategorySelect,
+    populateCountrySelect,
+    submit,
+    isContestClosed,
+    COUNTRIES,
+  };
 })();

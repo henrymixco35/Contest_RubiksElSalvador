@@ -1,16 +1,17 @@
 /**
- * session.js
+ * Session.js
  */
 
 const SessionStore = (() => {
 
   const KEY = 'rubik_sv_session';
 
+  /* ── Guardar ────────────────────────────────────────── */
   function save() {
     if (!AppState.contestant) return;
     const data = {
-      contestant: AppState.contestant,
-      solves:     AppState.solves,
+      contestant:   AppState.contestant,
+      solves:       AppState.solves,
       currentSolve: AppState.currentSolve,
     };
     try {
@@ -20,10 +21,12 @@ const SessionStore = (() => {
     }
   }
 
+  /* ── Limpiar ────────────────────────────────────────── */
   function clear() {
     try { sessionStorage.removeItem(KEY); } catch (e) {}
   }
 
+  /* ── Restaurar ──────────────────────────────────────── */
   function tryRestore() {
     let raw;
     try { raw = sessionStorage.getItem(KEY); } catch (e) { return; }
@@ -32,54 +35,91 @@ const SessionStore = (() => {
     let data;
     try { data = JSON.parse(raw); } catch (e) { clear(); return; }
 
-    // Validar que la categoría siga existiendo en el contest activo
     const { contestant, solves, currentSolve } = data;
+
     if (!contestant || !AppState.contest.categories[contestant.category]) {
       clear();
       return;
     }
 
-    // Si ya envió resultados en esta categoría, ignorar sesión guardada
     const alreadySubmitted = AppState.results.some(
       r => r.email === contestant.email && r.category === contestant.category
     );
-    if (alreadySubmitted) { clear(); return; }
+    if (alreadySubmitted) {
+      clear();
+      return;
+    }
 
-    // Hay progreso real: preguntar al usuario si quiere continuar
-    if (!solves || solves.length === 0) { clear(); return; }
+    if (!solves || solves.length === 0) {
+      clear();
+      return;
+    }
 
+    // Cargar en AppState ANTES de mostrar el banner
     AppState.contestant   = contestant;
     AppState.solves       = solves;
     AppState.currentSolve = currentSolve;
 
-    // Mostrar banner de recuperación
-    _showRestoreBanner(() => {
-      Timer.init();   
-      UI.showView('view-contest');
-    }, () => {
-      clear();
-      AppState.contestant   = null;
-      AppState.solves       = [];
-      AppState.currentSolve = 0;
-    });
+    _showRestoreBanner(
+      () => {
+        Logger.warn('session_restored_after_reload', {
+          solvesRecovered: AppState.solves.length,
+          totalSolves:     AppState.solves.length,
+          category:        contestant.category,
+          note:            'Competidor recargó la página y eligió continuar',
+        });
+
+        Storage.updateParticipantSession(
+          contestant.email,
+          contestant.category,
+          {
+            pageReloads:    FB.increment(1),
+            timerLastSeen:  new Date().toISOString(),
+          },
+        );
+
+        Timer.init(true);
+        UI.showView('view-contest');
+      },
+      () => {
+        // ── Descartar ─────────────────────────────────────────
+        Logger.info('session_discarded_after_reload', {
+          solvesLost: AppState.solves.length,
+          category:   contestant.category,
+        });
+
+        clear();
+        AppState.contestant   = null;
+        AppState.solves       = [];
+        AppState.currentSolve = 0;
+      },
+    );
   }
 
+  /* ── Banner de recuperación ─────────────────────────── */
   function _showRestoreBanner(onContinue, onDiscard) {
+    const catName = AppState.contest.categories[AppState.contestant.category]?.name
+                  || AppState.contestant.category;
+
     const overlay = document.createElement('div');
     overlay.style.cssText = `
-      position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(6px);
-      z-index:600;display:flex;align-items:center;justify-content:center;padding:1rem;
+      position:fixed;inset:0;background:rgba(0,0,0,.82);
+      backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+      z-index:600;display:flex;align-items:center;
+      justify-content:center;padding:1rem;
     `;
     overlay.innerHTML = `
-      <div style="background:var(--surface);border:1px solid var(--border2);border-radius:10px;
-                  padding:2rem;max-width:400px;width:100%;animation:fadeUp .2s ease;
-                  font-family:'Plus Jakarta Sans',sans-serif;">
-        <div style="font-family:'DM Serif Display',serif;font-size:1.4rem;margin-bottom:.6rem;">
+      <div style="
+        background:var(--surface);border:1px solid var(--border2);
+        border-radius:10px;padding:2rem;max-width:400px;width:100%;
+        animation:fadeUp .2s ease;font-family:var(--sans);
+      ">
+        <div style="font-family:var(--serif);font-size:1.4rem;margin-bottom:.6rem;">
           Sesión guardada
         </div>
         <p style="color:var(--muted2);font-size:.88rem;line-height:1.65;margin-bottom:1.2rem;">
           Tenés <strong style="color:var(--accent)">${AppState.solves.length} solve(s)</strong>
-          guardados en <strong style="color:var(--text)">${AppState.contest.categories[AppState.contestant.category]?.name}</strong>
+          guardados en <strong style="color:var(--text)">${catName}</strong>
           para <strong style="color:var(--text)">${AppState.contestant.name}</strong>.
           ¿Querés continuar donde lo dejaste?
         </p>
@@ -94,6 +134,7 @@ const SessionStore = (() => {
       </div>
     `;
     document.body.appendChild(overlay);
+
     overlay.querySelector('#sr-continue').addEventListener('click', () => {
       overlay.remove();
       onContinue();

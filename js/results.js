@@ -10,11 +10,12 @@ const Results = (() => {
   const MO3_CATS = new Set(['6x6', '7x7']);
   const isMo3 = (cat) => MO3_CATS.has(cat);
 
+  /* ── Envío de resultados ────────────────────────────── */
   async function submit() {
     if (_isSubmitting) return;
 
     const dupCheck = AppState.results.some(
-      r => r.email === AppState.contestant.email &&
+      r => r.email    === AppState.contestant.email &&
            r.category === AppState.contestant.category
     );
     if (dupCheck) {
@@ -45,30 +46,65 @@ const Results = (() => {
 
     try {
       const newId = await Storage.saveResult(result);
-      result.id = newId;
+      result.id   = newId;
+
+      // ── Envío exitoso ──────────────────────────────────
+      Logger.info('results_submitted', {
+        resultId: newId,
+        ao5:      result.ao5,
+        ao5ms:    result.ao5ms,
+        best:     result.best,
+        solves:   result.solves.map(s => ({
+          ms:      s.ms,
+          penalty: s.penalty || null,
+          display: Timer.formatSolve(s),
+        })),
+      });
+
+      AppState.results.push(result);
+      AppState.lastOwnResult = result;
+
+      SessionStore.clear();
+
+      const submittedName     = AppState.contestant.name;
+      const submittedCatName  = AppState.contest.categories[AppState.contestant.category]?.name || '';
+      AppState.contestant     = null;
+      AppState.solves         = [];
+      AppState.currentSolve   = 0;
+      AppState.currentPenalty = null;
+
+      document.getElementById('success-msg').textContent =
+        `${submittedName} — ${submittedCatName} — ${Timer.getStatLabel()}: ${result.ao5}`;
+
+      document.getElementById('modal-success').classList.add('open');
+
     } catch (err) {
+      // ── Error al guardar ───────────────────────────────
+      Logger.error('submit_failed', {
+        errorCode:    err?.code    || null,
+        errorMessage: err?.message || String(err),
+        solves:       AppState.solves.map(s => ({
+          ms:      s.ms,
+          penalty: s.penalty || null,
+          display: Timer.formatSolve(s),
+        })),
+        ao5:  Timer.getAo5Display(),
+        best: Timer.getBestDisplay(),
+      });
+
       console.error('[Results] saveResult:', err);
       UI.toast('⚠ Error al guardar resultados. Intentá de nuevo.');
+
+    } finally {
       _isSubmitting = false;
       if (submitBtn) {
         submitBtn.disabled    = false;
         submitBtn.textContent = '✓ Enviar Resultados';
       }
-      return;
     }
-
-    AppState.results.push(result);
-    AppState.lastOwnResult = result;
-
-    SessionStore.clear();
-
-    const catName = AppState.contest.categories[AppState.contestant.category]?.name || '';
-    document.getElementById('success-msg').textContent =
-      `${result.name} — ${catName} — ${Timer.getStatLabel()}: ${result.ao5}`;
-
-    document.getElementById('modal-success').classList.add('open');
   }
 
+  /* ── Render de tabla ────────────────────────────────── */
   function render(visibleCats) {
     const isOrg   = AppState.isOrganizer;
     const myEmail = AppState.contestant?.email || null;
@@ -103,7 +139,7 @@ const Results = (() => {
 
     catIds.forEach(id => {
       const catName = AppState.contest.categories[id]?.name || id;
-      const btn = document.createElement('button');
+      const btn     = document.createElement('button');
       btn.className   = 'cat-tab' + (id === currentCat ? ' active' : '');
       btn.textContent = catName;
       btn.onclick     = () => { currentCat = id; render(visibleCats); };
@@ -137,7 +173,7 @@ const Results = (() => {
 
     let approvedRank = 0;
 
-    filtered.forEach((r) => {
+    filtered.forEach(r => {
       const tr     = document.createElement('tr');
       const isOwn  = myEmail && r.email === myEmail;
       const status = r.status || 'pending';
@@ -145,16 +181,18 @@ const Results = (() => {
       let posCell = '—';
       if (status === 'approved') {
         approvedRank++;
-        posCell = approvedRank;
+        posCell     = approvedRank;
         tr.className = ['', 'rank-1', 'rank-2', 'rank-3'][approvedRank] || '';
       }
 
       const solveCells = (r.solves || []).map(s => {
         const t   = Timer.formatSolve(s);
-        const cls = s.penalty === 'dnf' ? 'time-dnf' : s.penalty === 'plus2' ? 'time-plus' : '';
+        const cls = s.penalty === 'dnf'   ? 'time-dnf'  :
+                    s.penalty === 'plus2' ? 'time-plus'  : '';
         return `<td class="${cls}">${t}</td>`;
       }).join('');
-      const padding     = Array(totalSolves - (r.solves || []).length).fill('<td>—</td>').join('');
+      const padding     = Array(totalSolves - (r.solves || []).length)
+                            .fill('<td>—</td>').join('');
       const statusBadge = _statusBadge(status);
 
       let actionCell = `<td>${statusBadge}</td>`;
@@ -163,9 +201,18 @@ const Results = (() => {
           <td style="white-space:nowrap;">
             ${statusBadge}
             <div style="display:flex;gap:.3rem;margin-top:.35rem;flex-wrap:wrap;">
-              ${status !== 'approved' ? `<button class="approval-btn approve" onclick="Results.setStatus('${r.id}','approved')">✓ Aprobar</button>` : ''}
-              ${status !== 'rejected' ? `<button class="approval-btn reject"  onclick="Results.setStatus('${r.id}','rejected')">✕ Rechazar</button>` : ''}
-              ${status !== 'pending'  ? `<button class="approval-btn pending" onclick="Results.setStatus('${r.id}','pending')">↺ Pendiente</button>` : ''}
+              ${status !== 'approved'
+                ? `<button class="approval-btn approve"
+                           onclick="Results.setStatus('${r.id}','approved')">✓ Aprobar</button>`
+                : ''}
+              ${status !== 'rejected'
+                ? `<button class="approval-btn reject"
+                           onclick="Results.setStatus('${r.id}','rejected')">✕ Rechazar</button>`
+                : ''}
+              ${status !== 'pending'
+                ? `<button class="approval-btn pending"
+                           onclick="Results.setStatus('${r.id}','pending')">↺ Pendiente</button>`
+                : ''}
             </div>
           </td>`;
       }
@@ -193,21 +240,23 @@ const Results = (() => {
     return map[status] || map.pending;
   }
 
+  /* ── Cambio de estado (organizador) ─────────────────── */
   async function setStatus(resultId, newStatus) {
     if (!AppState.isOrganizer) return;
     try {
       await Storage.updateResultStatus(resultId, newStatus);
-      UI.toast(newStatus === 'approved' ? '✓ Resultado aprobado' :
-               newStatus === 'rejected' ? '✕ Resultado rechazado' : '↺ Marcado como pendiente');
+      UI.toast(
+        newStatus === 'approved' ? '✓ Resultado aprobado'  :
+        newStatus === 'rejected' ? '✕ Resultado rechazado' :
+        '↺ Marcado como pendiente'
+      );
     } catch (err) {
       console.error('[Results] setStatus:', err);
       UI.toast('⚠ Error al actualizar: ' + err.message);
     }
   }
 
-  /* ──────────────────────────────────────────────────────
-     EXPORTAR — HTML compacto estilo screenshot
-     ────────────────────────────────────────────────────── */
+  /* ── Exportar HTML ──────────────────────────────────── */
   function exportCSV() {
     if (!currentCat) return;
 
@@ -224,7 +273,9 @@ const Results = (() => {
       .filter(r => r.category === currentCat && (r.status || 'pending') === 'approved')
       .sort((a, b) => (a.ao5ms ?? Infinity) - (b.ao5ms ?? Infinity));
 
-    const solveHeaders = Array.from({ length: totalExp }, (_, i) => `<th>${i + 1}</th>`).join('');
+    const solveHeaders = Array.from(
+      { length: totalExp }, (_, i) => `<th>${i + 1}</th>`
+    ).join('');
 
     const tableRows = sorted.map((r, idx) => {
       const pos    = idx + 1;
@@ -243,10 +294,10 @@ const Results = (() => {
         const t   = Timer.formatSolve(s);
         const ms  = Timer.getSolveMs(s);
         let cls   = '';
-        if (s.penalty === 'dnf')                        cls = 'td';
-        else if (!mo3exp && ms === worstMs)             cls = 'tw';
+        if (s.penalty === 'dnf')                             cls = 'td';
+        else if (!mo3exp && ms === worstMs)                  cls = 'tw';
         else if (!mo3exp && ms === bestMs && ms !== worstMs) cls = 'tb';
-        else if (s.penalty === 'plus2')                 cls = 'tp';
+        else if (s.penalty === 'plus2')                      cls = 'tp';
         return `<td class="${cls}">${t}</td>`;
       }).join('');
 
@@ -261,10 +312,13 @@ const Results = (() => {
     }).join('');
 
     const podiumCards = sorted.slice(0, 3).map((r, i) => {
-      const medals  = ['🥇', '🥈', '🥉'];
-      const cls     = ['p1', 'p2', 'p3'];
+      const medals = ['🥇', '🥈', '🥉'];
+      const cls    = ['p1', 'p2', 'p3'];
       return `<div class="pc ${cls[i]}">
-        <div class="pc-row"><span class="pc-medal">${medals[i]}</span><span class="pc-avg">${r.ao5 || '—'}</span></div>
+        <div class="pc-row">
+          <span class="pc-medal">${medals[i]}</span>
+          <span class="pc-avg">${r.ao5 || '—'}</span>
+        </div>
         <div class="pc-name">${_escHtml(r.name)}</div>
         <div class="pc-ctry">${_escHtml(r.country || '—')}</div>
       </div>`;
@@ -285,27 +339,17 @@ const Results = (() => {
   --mo:'Space Mono',monospace;--sa:'Plus Jakarta Sans',sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{
-  background:var(--bg);color:var(--tx);font-family:var(--sa);
-  width:820px;margin:0 auto;padding:14px 16px 20px;
-  -webkit-print-color-adjust:exact;print-color-adjust:exact;
-}
-/* Header */
-.hdr{display:flex;align-items:flex-start;justify-content:space-between;
-     padding-bottom:9px;border-bottom:1px solid var(--bd);margin-bottom:9px;}
-.tag{font-family:var(--mo);font-size:.54rem;letter-spacing:.11em;text-transform:uppercase;
-     color:var(--ac);background:rgba(58,123,213,.12);border:1px solid rgba(58,123,213,.28);
-     border-radius:3px;padding:.18rem .5rem;margin-right:6px;}
+body{background:var(--bg);color:var(--tx);font-family:var(--sa);width:820px;margin:0 auto;padding:14px 16px 20px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.hdr{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:9px;border-bottom:1px solid var(--bd);margin-bottom:9px;}
+.tag{font-family:var(--mo);font-size:.54rem;letter-spacing:.11em;text-transform:uppercase;color:var(--ac);background:rgba(58,123,213,.12);border:1px solid rgba(58,123,213,.28);border-radius:3px;padding:.18rem .5rem;margin-right:6px;}
 .ci{font-family:var(--mo);font-size:.58rem;color:var(--m2);}
 .tb{display:flex;align-items:baseline;gap:7px;margin-top:3px;}
 .tc{font-size:1.05rem;font-weight:700;letter-spacing:-.01em;}
 .tf{font-family:var(--mo);font-size:.6rem;color:var(--a3);}
 .hr{font-family:var(--mo);font-size:.54rem;color:var(--mu);text-align:right;line-height:1.85;}
 .hr strong{color:var(--tx);font-size:.63rem;}
-/* Podio */
 .pod{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:9px;}
-.pc{background:var(--sf);border:1px solid var(--bd);border-radius:5px;
-    padding:7px 9px;position:relative;overflow:hidden;}
+.pc{background:var(--sf);border:1px solid var(--bd);border-radius:5px;padding:7px 9px;position:relative;overflow:hidden;}
 .pc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
 .p1::before{background:var(--gd);}.p2::before{background:var(--sv);}.p3::before{background:var(--bz);}
 .pc-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
@@ -313,19 +357,14 @@ body{
 .pc-avg{font-family:var(--mo);font-size:.88rem;font-weight:700;color:var(--a3);}
 .pc-name{font-size:.77rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pc-ctry{font-size:.6rem;color:var(--m2);font-family:var(--mo);}
-/* Tabla */
 .tw{background:var(--sf);border:1px solid var(--bd);border-radius:5px;overflow:hidden;}
-.th{display:flex;align-items:center;justify-content:space-between;
-    padding:5px 9px;background:var(--sf2);border-bottom:1px solid var(--bd);}
+.th{display:flex;align-items:center;justify-content:space-between;padding:5px 9px;background:var(--sf2);border-bottom:1px solid var(--bd);}
 .tl{font-family:var(--mo);font-size:.52rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mu);}
 .tc2{font-family:var(--mo);font-size:.52rem;color:var(--m2);}
 table{width:100%;border-collapse:collapse;font-family:var(--mo);font-size:.68rem;}
-thead th{padding:5px 8px;text-align:center;font-size:.5rem;letter-spacing:.11em;
-         text-transform:uppercase;color:var(--mu);border-bottom:1px solid var(--bd);
-         background:var(--sf2);white-space:nowrap;}
+thead th{padding:5px 8px;text-align:center;font-size:.5rem;letter-spacing:.11em;text-transform:uppercase;color:var(--mu);border-bottom:1px solid var(--bd);background:var(--sf2);white-space:nowrap;}
 thead th.thn,thead th.thc{text-align:left;}
-tbody td{padding:4px 8px;border-bottom:1px solid rgba(255,255,255,.03);
-         vertical-align:middle;text-align:center;white-space:nowrap;}
+tbody td{padding:4px 8px;border-bottom:1px solid rgba(255,255,255,.03);vertical-align:middle;text-align:center;white-space:nowrap;}
 tbody tr:last-child td{border-bottom:none;}
 td.pos{text-align:center;font-weight:700;color:var(--m2);}
 td.name{text-align:left;font-family:var(--sa);font-weight:600;font-size:.74rem;padding-left:9px;}
@@ -336,22 +375,11 @@ td.td{color:var(--a2);}
 td.tw{color:var(--a2);text-decoration:underline dotted;}
 td.tb{color:var(--a4);}
 td.tp{color:var(--a3);}
-tr.r1 td{background:rgba(255,215,0,.05);}
-tr.r2 td{background:rgba(184,196,216,.03);}
-tr.r3 td{background:rgba(205,139,74,.035);}
-tr.re td{background:rgba(255,255,255,.009);}
-tr.r1 td.pos{color:var(--gd);font-size:.88rem;}
-tr.r2 td.pos{color:var(--sv);font-size:.88rem;}
-tr.r3 td.pos{color:var(--bz);font-size:.88rem;}
-/* Footer */
-.ft{display:flex;justify-content:space-between;margin-top:8px;
-    font-family:var(--mo);font-size:.5rem;color:var(--mu);}
-@media print{
-  body{background:#fff;color:#111;width:100%;}
-  :root{--bg:#fff;--sf:#f5f6fa;--sf2:#eaecf4;--tx:#111;--mu:#888;--m2:#666;
-        --bd:rgba(0,0,0,.1);--ac:#1a5cb8;--a2:#c0103a;--a3:#8a6000;--a4:#0f7a5f;
-        --gd:#b8860b;--sv:#666;--bz:#8b5e00;}
-}
+tr.r1 td{background:rgba(255,215,0,.05);}tr.r2 td{background:rgba(184,196,216,.03);}
+tr.r3 td{background:rgba(205,139,74,.035);}tr.re td{background:rgba(255,255,255,.009);}
+tr.r1 td.pos{color:var(--gd);font-size:.88rem;}tr.r2 td.pos{color:var(--sv);font-size:.88rem;}tr.r3 td.pos{color:var(--bz);font-size:.88rem;}
+.ft{display:flex;justify-content:space-between;margin-top:8px;font-family:var(--mo);font-size:.5rem;color:var(--mu);}
+@media print{body{background:#fff;color:#111;width:100%;}:root{--bg:#fff;--sf:#f5f6fa;--sf2:#eaecf4;--tx:#111;--mu:#888;--m2:#666;--bd:rgba(0,0,0,.1);--ac:#1a5cb8;--a2:#c0103a;--a3:#8a6000;--a4:#0f7a5f;--gd:#b8860b;--sv:#666;--bz:#8b5e00;}}
 </style>
 </head>
 <body>
@@ -360,7 +388,7 @@ tr.r3 td.pos{color:var(--bz);font-size:.88rem;}
     <div><span class="tag">Rubik's SV</span><span class="ci">${_escHtml(contestName)}</span></div>
     <div class="tb">
       <span class="tc">${_escHtml(catName)}</span>
-      <span class="tf">Formato: ${statExp} &nbsp;·&nbsp; Clasificación por ${statExp === 'Mo3' ? 'Media' : 'Average'}</span>
+      <span class="tf">Formato: ${statExp} · Clasificación por ${statExp === 'Mo3' ? 'Media' : 'Average'}</span>
     </div>
   </div>
   <div class="hr">
@@ -368,9 +396,7 @@ tr.r3 td.pos{color:var(--bz);font-size:.88rem;}
     <div>${exportDate}</div>
   </div>
 </div>
-
 ${sorted.length >= 1 ? `<div class="pod">${podiumCards}</div>` : ''}
-
 <div class="tw">
   <div class="th">
     <span class="tl">Tabla completa — aprobados</span>
@@ -390,7 +416,6 @@ ${sorted.length >= 1 ? `<div class="pod">${podiumCards}</div>` : ''}
     <tbody>${tableRows}</tbody>
   </table>
 </div>
-
 <div class="ft">
   <span>Comunidad Rubik's El Salvador</span>
   <span>${exportDate}</span>
@@ -401,14 +426,14 @@ ${sorted.length >= 1 ? `<div class="pod">${podiumCards}</div>` : ''}
     const blob = new Blob([html], { type: 'text/html;charset=utf-8;' });
     const link = document.createElement('a');
     link.href     = URL.createObjectURL(blob);
-    link.download = `resultados_${catName}_${new Date().toISOString().slice(0, 10)}.html`;
+    link.download = `resultados_${catName}_${new Date().toISOString().slice(0,10)}.html`;
     link.click();
   }
 
   function _escHtml(str) {
     return String(str)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   function resetSubmitFlag() { _isSubmitting = false; }

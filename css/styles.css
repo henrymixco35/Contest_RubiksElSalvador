@@ -309,7 +309,7 @@ header {
 }
 
 /* ════════════════════════════════════════════════════════
-   SIDEBAR — desktop base (siempre visible, sin toggle)
+   SIDEBAR — desktop
    ════════════════════════════════════════════════════════ */
 .contest-sidebar {
   border-right: 1px solid var(--border);
@@ -320,8 +320,6 @@ header {
   gap: .6rem;
 }
 
-/* En desktop: inner toma el espacio disponible y el botón
-   de abandonar queda anclado al fondo */
 .sidebar-inner {
   display: flex;
   flex-direction: column;
@@ -331,8 +329,15 @@ header {
   overflow-y: auto;
 }
 
-.sidebar-toggle     { display: none; }   /* oculto en desktop */
-.mobile-abandon-btn { display: none; }   /* oculto en desktop */
+.sidebar-toggle     { display: none; }
+
+/* ─────────────────────────────────────────────────────
+   FIX 1: .mobile-abandon-btn siempre oculto.
+   El botón de abandonar vive DENTRO del sidebar-inner
+   (collapse) en móvil — no necesitamos duplicarlo flotando
+   arriba del main. Ocultar en todos los breakpoints.
+   ───────────────────────────────────────────────────── */
+.mobile-abandon-btn { display: none !important; }
 
 .sidebar-label {
   font-family: var(--mono);
@@ -385,8 +390,6 @@ header {
 .ao-row span:first-child { color: var(--muted); }
 .ao-row span:last-child  { color: var(--accent3); font-weight: 700; }
 
-/* El botón de abandonar está FUERA del sidebar-inner para
-   no ser afectado por overflow/flex y siempre estar visible */
 .sidebar-bottom { padding-top: 1.2rem; flex-shrink: 0; }
 
 /* ── Contest main ────────────────────────────────────── */
@@ -403,6 +406,26 @@ header {
   user-select: none;
   -webkit-user-select: none;
 }
+
+/* ─────────────────────────────────────────────────────
+   FIX 2: Overlay de stop para móvil.
+   Cuando el timer está corriendo (clase .timer-running
+   que se agrega desde JS al body), aparece un overlay
+   transparente e invisible encima de todo el contest-main
+   que captura CUALQUIER tap para detener el timer.
+   Solo aplica mientras corre — no interfiere con
+   inspección, scramble, ni botones.
+   ───────────────────────────────────────────────────── */
+.stop-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 50;          /* sobre contenido, bajo modales (z-index 500) */
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  background: transparent;
+}
+body.timer-running .stop-overlay { display: block; }
 
 /* ── Scramble ────────────────────────────────────────── */
 .scramble-display {
@@ -878,6 +901,54 @@ tbody tr:hover td      { background: var(--surface2); }
   font-size: .72rem;
 }
 
+/* ── Logs panel ──────────────────────────────────────── */
+.logs-filters {
+  display: flex;
+  gap: .6rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: .8rem;
+}
+.logs-filters select,
+.logs-filters input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: .4rem .7rem;
+  font-family: var(--mono);
+  font-size: .68rem;
+  border-radius: var(--radius);
+  outline: none;
+  transition: border-color .2s;
+}
+.logs-filters select:focus,
+.logs-filters input:focus { border-color: var(--accent); }
+
+.logs-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: auto;
+  max-height: 480px;
+}
+
+#logs-loading {
+  padding: 1.5rem;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: .72rem;
+  color: var(--muted);
+}
+
+#no-logs {
+  padding: 2rem;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: .78rem;
+  color: var(--muted);
+  display: none;
+}
+
 /* ── Modales ─────────────────────────────────────────── */
 .modal-overlay {
   display: none;
@@ -967,11 +1038,10 @@ tbody tr:hover td      { background: var(--surface2); }
 ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 
 /* ══════════════════════════════════════════════════════
-   MÓVIL ≤ 700px — sidebar colapsable BAJO el timer
+   MÓVIL ≤ 700px
    ══════════════════════════════════════════════════════ */
 @media (max-width: 700px) {
 
-  /* Layout vertical: timer arriba, sidebar abajo */
   .contest-layout {
     display: flex !important;
     flex-direction: column !important;
@@ -985,21 +1055,18 @@ tbody tr:hover td      { background: var(--surface2); }
     justify-content: flex-start;
   }
 
-  /* Sidebar como panel colapsable al fondo */
   .contest-sidebar {
     order: 2;
     background: var(--surface);
     border-top: 1px solid var(--border);
     border-right: none !important;
-    /* Sin padding aquí: el toggle y el inner lo manejan */
     padding: 0 !important;
     gap: 0 !important;
-    /* No fijar altura; crecer según contenido */
     height: auto !important;
     overflow: visible !important;
   }
 
-  /* Toggle: visible en móvil */
+  /* Toggle visible en móvil */
   .sidebar-toggle {
     display: flex !important;
     align-items: center;
@@ -1023,9 +1090,8 @@ tbody tr:hover td      { background: var(--surface2); }
   .sidebar-toggle-arrow { transition: transform .25s; font-size: .7rem; }
   .sidebar-toggle.open .sidebar-toggle-arrow { transform: rotate(180deg); }
 
-  /* Inner: oculto por defecto, visible cuando toggle.open */
   .sidebar-inner {
-    display: none !important;      /* oculto base */
+    display: none !important;
     flex: unset !important;
     min-height: unset !important;
     overflow-y: auto;
@@ -1034,14 +1100,11 @@ tbody tr:hover td      { background: var(--surface2); }
     gap: .5rem;
     flex-direction: column;
   }
-  .sidebar-inner.open {
-    display: flex !important;      /* visible cuando abierto */
-  }
+  .sidebar-inner.open { display: flex !important; }
 
-  /* Botón abandonar: siempre visible, DENTRO del inner en móvil */
   .sidebar-bottom { display: block; }
 
-  /* Solves en fila */
+  /* Solves en fila en móvil */
   .solve-list {
     flex-direction: row !important;
     flex-wrap: wrap;
@@ -1056,15 +1119,6 @@ tbody tr:hover td      { background: var(--surface2); }
     justify-content: center;
   }
 
-  /* Botón abandonar flotante en el main (arriba derecha) */
-  .mobile-abandon-btn {
-    display: flex !important;
-    justify-content: flex-end;
-    width: 100%;
-    max-width: 600px;
-    margin-bottom: .25rem;
-  }
-
   .timer-display    { font-size: clamp(3rem, 18vw, 6rem); }
   .scramble-display,
   .submit-section   { max-width: 100%; }
@@ -1073,46 +1127,37 @@ tbody tr:hover td      { background: var(--surface2); }
 }
 
 /* ══════════════════════════════════════════════════════
-   NO-SCROLL en la vista del timer — clase in-contest
-   Solo se aplica en desktop (> 700px)
+   NO-SCROLL en desktop mientras corre el timer
    ══════════════════════════════════════════════════════ */
 @media (min-width: 701px) {
   body.in-contest {
     overflow: hidden;
     height: 100dvh;
   }
-
   body.in-contest #app {
     height: 100dvh;
     overflow: hidden;
   }
-
   body.in-contest #view-contest {
     height: calc(100dvh - 57px);
     overflow: hidden;
     flex: 0 0 auto;
   }
-
   body.in-contest .contest-layout {
     height: 100%;
     overflow: hidden;
   }
-
-  /* Sidebar: flex column para que el botón quede anclado */
   body.in-contest .contest-sidebar {
     height: 100%;
     display: flex;
     flex-direction: column;
     overflow: visible;
   }
-
-  /* El inner scrollea, el botón de abandonar no */
   body.in-contest .sidebar-inner {
     flex: 1;
     overflow-y: auto;
     min-height: 0;
   }
-
   body.in-contest .contest-main {
     height: 100%;
     overflow: hidden;
