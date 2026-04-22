@@ -437,6 +437,14 @@ body.timer-running .stop-overlay { display: block; }
   padding: 1.2rem 1.4rem;
 }
 
+/* En desktop aprovechamos todo el ancho disponible
+   para que scrambles de 7x7 no queden tan apilados */
+@media (min-width: 701px) {
+  .scramble-display {
+    max-width: 820px;
+  }
+}
+
 .scramble-header {
   font-family: var(--mono);
   font-size: .58rem;
@@ -1127,7 +1135,11 @@ tbody tr:hover td      { background: var(--surface2); }
 }
 
 /* ══════════════════════════════════════════════════════
-   NO-SCROLL en desktop mientras corre el timer
+   DESKTOP — contest layout fijo, scroll dentro del main
+   El scroll de la página se previene solo via JS
+   (e.preventDefault() en keydown Space), no con CSS,
+   para que scrambles largos como 7x7 sean legibles
+   y los botones de penalidad sean accesibles.
    ══════════════════════════════════════════════════════ */
 @media (min-width: 701px) {
   body.in-contest {
@@ -1158,10 +1170,19 @@ tbody tr:hover td      { background: var(--surface2); }
     overflow-y: auto;
     min-height: 0;
   }
+  /* contest-main scrollea verticalmente para que scrambles
+     largos (7x7, 6x6) y los botones de penalidad sean
+     siempre accesibles. justify-content: flex-start para
+     que el contenido empiece arriba y sea scrolleable. */
   body.in-contest .contest-main {
     height: 100%;
-    overflow: hidden;
-    justify-content: center;
+    overflow-y: auto;
+    overflow-x: hidden;
+    justify-content: flex-start;
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+    /* Centrar verticalmente cuando el contenido cabe */
+    align-items: center;
   }
 }
 

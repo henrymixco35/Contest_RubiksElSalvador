@@ -14,6 +14,7 @@ const Results = (() => {
   async function submit() {
     if (_isSubmitting) return;
 
+    // Verificar duplicado antes de bloquear UI
     const dupCheck = AppState.results.some(
       r => r.email    === AppState.contestant.email &&
            r.category === AppState.contestant.category
@@ -64,8 +65,8 @@ const Results = (() => {
       AppState.results.push(result);
       AppState.lastOwnResult = result;
 
+      // Limpiar la sesión guardada
       SessionStore.clear();
-
       const submittedName     = AppState.contestant.name;
       const submittedCatName  = AppState.contest.categories[AppState.contestant.category]?.name || '';
       AppState.contestant     = null;
@@ -277,11 +278,24 @@ const Results = (() => {
       { length: totalExp }, (_, i) => `<th>${i + 1}</th>`
     ).join('');
 
+    const C_DNF   = '#e84560';  // rojo  — DNF / peor tiempo
+    const C_BEST  = '#4ec9b0';  // verde — mejor tiempo
+    const C_PLUS2 = '#f0c040';  // amarillo — +2
+    const C_AVG   = '#f0c040';  // amarillo — Ao5/Mo3
+    const C_MUTED = '#7a8099';  // gris  — país
+
     const tableRows = sorted.map((r, idx) => {
       const pos    = idx + 1;
       const medal  = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : pos;
-      const rowCls = pos === 1 ? 'r1' : pos === 2 ? 'r2' : pos === 3 ? 'r3'
-                   : idx % 2 === 0 ? 're' : 'ro';
+
+      // Fondo de fila según posición
+      const rowBg  = pos === 1 ? 'background:rgba(255,215,0,.05)'
+                   : pos === 2 ? 'background:rgba(184,196,216,.03)'
+                   : pos === 3 ? 'background:rgba(205,139,74,.035)'
+                   : idx % 2 === 0 ? 'background:rgba(255,255,255,.009)' : '';
+
+      // Color del número/medalla de posición
+      const posCl  = pos === 1 ? '#ffd700' : pos === 2 ? '#b8c4d8' : pos === 3 ? '#cd8b4a' : '#5a5f7a';
 
       const times   = (r.solves || []).map(s => Timer.getSolveMs(s));
       const srtd    = [...times].sort((a, b) => a - b);
@@ -290,37 +304,53 @@ const Results = (() => {
 
       const solveCols = Array.from({ length: totalExp }, (_, i) => {
         const s = (r.solves || [])[i];
-        if (!s) return `<td>—</td>`;
-        const t   = Timer.formatSolve(s);
-        const ms  = Timer.getSolveMs(s);
-        let cls   = '';
-        if (s.penalty === 'dnf')                             cls = 'td';
-        else if (!mo3exp && ms === worstMs)                  cls = 'tw';
-        else if (!mo3exp && ms === bestMs && ms !== worstMs) cls = 'tb';
-        else if (s.penalty === 'plus2')                      cls = 'tp';
-        return `<td class="${cls}">${t}</td>`;
+        if (!s) return `<td style="text-align:center;padding:7px 10px;">—</td>`;
+        const ms = Timer.getSolveMs(s);
+
+        let color = '';
+        if      (s.penalty === 'dnf')                           color = C_DNF;
+        else if (!mo3exp && ms === worstMs)                     color = C_DNF;
+        else if (!mo3exp && ms === bestMs && ms !== worstMs)    color = C_BEST;
+        else if (s.penalty === 'plus2')                         color = C_PLUS2;
+
+        let txt;
+        if (s.penalty === 'dnf') {
+          txt = 'DNF';
+        } else {
+          const baseMs = s.ms + (s.penalty === 'plus2' ? 2000 : 0);
+          txt = Timer.msToDisplay(baseMs);
+          if (s.penalty === 'plus2') txt += ' +2';
+        }
+
+        const st = color ? `color:${color};font-weight:700;` : '';
+        return `<td style="text-align:center;padding:5px 8px;white-space:nowrap;${st}">${txt}</td>`;
       }).join('');
 
-      return `<tr class="${rowCls}">
-        <td class="pos">${medal}</td>
-        <td class="name">${_escHtml(r.name)}</td>
-        <td class="country">${_escHtml(r.country || '—')}</td>
+      // Best y Ao5 también inline
+      const bestTxt = (r.best || '—');
+      const avgTxt  = (r.ao5  || '—');
+
+      return `<tr style="${rowBg}">
+        <td style="text-align:center;padding:5px 6px;font-weight:700;color:${posCl};font-size:.82rem;">${medal}</td>
+        <td style="text-align:left;padding:5px 10px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:600;font-size:.74rem;white-space:nowrap;">${_escHtml(r.name)}</td>
+        <td style="text-align:left;padding:5px 8px;color:${C_MUTED};font-size:.62rem;">${_escHtml(r.country || '—')}</td>
         ${solveCols}
-        <td class="best">${r.best || '—'}</td>
-        <td class="avg">${r.ao5 || '—'}</td>
+        <td style="text-align:center;padding:5px 8px;color:${C_BEST};font-weight:700;white-space:nowrap;">${bestTxt}</td>
+        <td style="text-align:center;padding:5px 8px;color:${C_AVG};font-weight:700;white-space:nowrap;">${avgTxt}</td>
       </tr>`;
     }).join('');
 
     const podiumCards = sorted.slice(0, 3).map((r, i) => {
-      const medals = ['🥇', '🥈', '🥉'];
-      const cls    = ['p1', 'p2', 'p3'];
-      return `<div class="pc ${cls[i]}">
-        <div class="pc-row">
-          <span class="pc-medal">${medals[i]}</span>
-          <span class="pc-avg">${r.ao5 || '—'}</span>
+      const medals  = ['🥇', '🥈', '🥉'];
+      const topClrs = ['#ffd700', '#b8c4d8', '#cd8b4a'];
+      return `<div style="background:#0f1120;border:1px solid rgba(255,255,255,.09);border-radius:5px;padding:6px 8px;position:relative;overflow:hidden;">
+        <div style="position:absolute;top:0;left:0;right:0;height:2px;background:${topClrs[i]};"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;">
+          <span style="font-size:.78rem;">${medals[i]}</span>
+          <span style="font-family:'Space Mono',monospace;font-size:.82rem;font-weight:700;color:#f0c040;">${r.ao5 || '—'}</span>
         </div>
-        <div class="pc-name">${_escHtml(r.name)}</div>
-        <div class="pc-ctry">${_escHtml(r.country || '—')}</div>
+        <div style="font-size:.72rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_escHtml(r.name)}</div>
+        <div style="font-size:.58rem;color:#7a8099;font-family:'Space Mono',monospace;">${_escHtml(r.country || '—')}</div>
       </div>`;
     }).join('');
 
@@ -331,83 +361,54 @@ const Results = (() => {
 <title>${_escHtml(catName)} — ${_escHtml(contestName)}</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap');
-:root{
-  --bg:#07080f;--sf:#0f1120;--sf2:#141727;--bd:rgba(255,255,255,.09);
-  --tx:#eef0f8;--mu:#5a5f7a;--m2:#7a8099;
-  --ac:#3a7bd5;--a2:#e84560;--a3:#f0c040;--a4:#4ec9b0;
-  --gd:#ffd700;--sv:#b8c4d8;--bz:#cd8b4a;
-  --mo:'Space Mono',monospace;--sa:'Plus Jakarta Sans',sans-serif;
-}
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--tx);font-family:var(--sa);width:820px;margin:0 auto;padding:14px 16px 20px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-.hdr{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:9px;border-bottom:1px solid var(--bd);margin-bottom:9px;}
-.tag{font-family:var(--mo);font-size:.54rem;letter-spacing:.11em;text-transform:uppercase;color:var(--ac);background:rgba(58,123,213,.12);border:1px solid rgba(58,123,213,.28);border-radius:3px;padding:.18rem .5rem;margin-right:6px;}
-.ci{font-family:var(--mo);font-size:.58rem;color:var(--m2);}
-.tb{display:flex;align-items:baseline;gap:7px;margin-top:3px;}
-.tc{font-size:1.05rem;font-weight:700;letter-spacing:-.01em;}
-.tf{font-family:var(--mo);font-size:.6rem;color:var(--a3);}
-.hr{font-family:var(--mo);font-size:.54rem;color:var(--mu);text-align:right;line-height:1.85;}
-.hr strong{color:var(--tx);font-size:.63rem;}
-.pod{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:9px;}
-.pc{background:var(--sf);border:1px solid var(--bd);border-radius:5px;padding:7px 9px;position:relative;overflow:hidden;}
-.pc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
-.p1::before{background:var(--gd);}.p2::before{background:var(--sv);}.p3::before{background:var(--bz);}
-.pc-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
-.pc-medal{font-size:.85rem;}
-.pc-avg{font-family:var(--mo);font-size:.88rem;font-weight:700;color:var(--a3);}
-.pc-name{font-size:.77rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.pc-ctry{font-size:.6rem;color:var(--m2);font-family:var(--mo);}
-.tw{background:var(--sf);border:1px solid var(--bd);border-radius:5px;overflow:hidden;}
-.th{display:flex;align-items:center;justify-content:space-between;padding:5px 9px;background:var(--sf2);border-bottom:1px solid var(--bd);}
-.tl{font-family:var(--mo);font-size:.52rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mu);}
-.tc2{font-family:var(--mo);font-size:.52rem;color:var(--m2);}
-table{width:100%;border-collapse:collapse;font-family:var(--mo);font-size:.68rem;}
-thead th{padding:5px 8px;text-align:center;font-size:.5rem;letter-spacing:.11em;text-transform:uppercase;color:var(--mu);border-bottom:1px solid var(--bd);background:var(--sf2);white-space:nowrap;}
-thead th.thn,thead th.thc{text-align:left;}
-tbody td{padding:4px 8px;border-bottom:1px solid rgba(255,255,255,.03);vertical-align:middle;text-align:center;white-space:nowrap;}
+body{background:#07080f;color:#eef0f8;font-family:'Space Mono',monospace;width:820px;margin:0 auto;padding:12px 14px 18px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.hdr{display:flex;align-items:flex-start;justify-content:space-between;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.09);margin-bottom:8px;}
+.tag{font-family:'Space Mono',monospace;font-size:.5rem;letter-spacing:.11em;text-transform:uppercase;color:#3a7bd5;background:rgba(58,123,213,.12);border:1px solid rgba(58,123,213,.28);border-radius:3px;padding:.15rem .45rem;margin-right:5px;display:inline-block;margin-bottom:4px;}
+.ci{font-family:'Space Mono',monospace;font-size:.55rem;color:#7a8099;}
+.tc{font-size:.95rem;font-weight:700;}
+.tf{font-family:'Space Mono',monospace;font-size:.55rem;color:#f0c040;margin-left:6px;}
+.hr{font-family:'Space Mono',monospace;font-size:.5rem;color:#5a5f7a;text-align:right;line-height:1.75;}
+.hr strong{color:#eef0f8;font-size:.58rem;}
+.pod{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-bottom:8px;}
+.tbl-wrap{background:#0f1120;border:1px solid rgba(255,255,255,.09);border-radius:5px;overflow:hidden;}
+table{width:100%;border-collapse:collapse;font-family:'Space Mono',monospace;font-size:.68rem;}
+thead tr{background:#141727;}
+thead th{padding:4px 8px;text-align:center;font-size:.48rem;letter-spacing:.11em;text-transform:uppercase;color:#5a5f7a;border-bottom:1px solid rgba(255,255,255,.09);white-space:nowrap;font-weight:400;}
+thead th:nth-child(2){text-align:left;}
+thead th:nth-child(3){text-align:left;}
 tbody tr:last-child td{border-bottom:none;}
-td.pos{text-align:center;font-weight:700;color:var(--m2);}
-td.name{text-align:left;font-family:var(--sa);font-weight:600;font-size:.74rem;padding-left:9px;}
-td.country{text-align:left;color:var(--m2);font-size:.61rem;}
-td.best{color:var(--a4);font-weight:700;}
-td.avg{color:var(--a3);font-weight:700;}
-td.td{color:var(--a2);}
-td.tw{color:var(--a2);text-decoration:underline dotted;}
-td.tb{color:var(--a4);}
-td.tp{color:var(--a3);}
-tr.r1 td{background:rgba(255,215,0,.05);}tr.r2 td{background:rgba(184,196,216,.03);}
-tr.r3 td{background:rgba(205,139,74,.035);}tr.re td{background:rgba(255,255,255,.009);}
-tr.r1 td.pos{color:var(--gd);font-size:.88rem;}tr.r2 td.pos{color:var(--sv);font-size:.88rem;}tr.r3 td.pos{color:var(--bz);font-size:.88rem;}
-.ft{display:flex;justify-content:space-between;margin-top:8px;font-family:var(--mo);font-size:.5rem;color:var(--mu);}
-@media print{body{background:#fff;color:#111;width:100%;}:root{--bg:#fff;--sf:#f5f6fa;--sf2:#eaecf4;--tx:#111;--mu:#888;--m2:#666;--bd:rgba(0,0,0,.1);--ac:#1a5cb8;--a2:#c0103a;--a3:#8a6000;--a4:#0f7a5f;--gd:#b8860b;--sv:#666;--bz:#8b5e00;}}
+tbody td{border-bottom:1px solid rgba(255,255,255,.03);vertical-align:middle;}
+.ft{display:flex;justify-content:space-between;margin-top:7px;font-family:'Space Mono',monospace;font-size:.48rem;color:#5a5f7a;}
+@media print{
+  body{background:#fff!important;color:#111!important;width:100%!important;}
+  .tbl-wrap{background:#f5f6fa!important;border-color:rgba(0,0,0,.1)!important;}
+  thead tr{background:#eaecf4!important;}
+}
 </style>
 </head>
 <body>
 <div class="hdr">
   <div>
-    <div><span class="tag">Rubik's SV</span><span class="ci">${_escHtml(contestName)}</span></div>
-    <div class="tb">
+    <div><span class="tag">Comunidad Rubik's SV</span><span class="ci">${_escHtml(contestName)}</span></div>
+    <div style="display:flex;align-items:baseline;margin-top:3px;">
       <span class="tc">${_escHtml(catName)}</span>
       <span class="tf">Formato: ${statExp} · Clasificación por ${statExp === 'Mo3' ? 'Media' : 'Average'}</span>
     </div>
   </div>
   <div class="hr">
-    <div><strong>${sorted.length}</strong> participante${sorted.length !== 1 ? 's' : ''} aprobados</div>
+    <div><strong>${sorted.length}</strong> participante${sorted.length !== 1 ? 's' : ''}</div>
     <div>${exportDate}</div>
   </div>
 </div>
 ${sorted.length >= 1 ? `<div class="pod">${podiumCards}</div>` : ''}
-<div class="tw">
-  <div class="th">
-    <span class="tl">Tabla completa — aprobados</span>
-    <span class="tc2">${sorted.length} resultado${sorted.length !== 1 ? 's' : ''}</span>
-  </div>
+<div class="tbl-wrap">
   <table>
     <thead>
       <tr>
-        <th style="width:28px;">#</th>
-        <th class="thn">Nombre</th>
-        <th class="thc">País</th>
+        <th style="width:36px;">#</th>
+        <th>Nombre</th>
+        <th>País</th>
         ${solveHeaders}
         <th>Best</th>
         <th>${statExp}</th>
