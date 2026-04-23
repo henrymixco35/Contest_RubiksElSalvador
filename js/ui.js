@@ -100,11 +100,23 @@ const UI = (() => {
     let visibleCats = null;
 
     if (!AppState.isOrganizer) {
-      if (!AppState.contestant) {
+      const email = AppState.contestant?.email
+                 || AppState.lastOwnResult?.email
+                 || null;
+
+      if (!email) {
         showEmailLogin();
         return;
       }
-      const email = AppState.contestant.email;
+
+      if (!AppState.contestant && AppState.lastOwnResult) {
+        AppState.contestant = {
+          name:     AppState.lastOwnResult.name,
+          email:    AppState.lastOwnResult.email,
+          category: AppState.lastOwnResult.category,
+        };
+      }
+
       visibleCats = AppState.results
         .filter(r => r.email === email)
         .map(r => r.category);
