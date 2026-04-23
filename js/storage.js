@@ -66,9 +66,14 @@ const Storage = (() => {
     });
     return ref.id;
   }
-  
+
   async function updateParticipantSession(email, category, data) {
     try {
+      const directId = AppState.contestant?.participantId;
+      if (directId) {
+        await FB.updateDoc(FB.doc(db, 'participants', directId), data);
+        return;
+      }
       const q    = FB.query(
         _participantsCol(),
         FB.where('email',    '==', email),

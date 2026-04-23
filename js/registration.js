@@ -93,6 +93,7 @@ const Registration = (() => {
       return;
     }
 
+    // Setear el competidor en AppState
     AppState.contestant = { name, email, category, country, suggestions };
 
     AppState.solves       = [];
@@ -112,16 +113,25 @@ const Registration = (() => {
           suggestions,
           timestamp:      new Date().toISOString(),
           timerEnteredAt: new Date().toISOString(),
-          pageReloads:    0,                         
+          pageReloads:    0,
         };
-        await Storage.saveParticipant(participant);
+        const newId = await Storage.saveParticipant(participant);
+        participant.id = newId;
         AppState.participants.push(participant);
+        AppState.contestant.participantId = newId;
       } catch (e) {
         console.error('[Registration] saveParticipant:', e);
         Logger.error('save_participant_failed', {
           errorMessage: e?.message || String(e),
           category,
         });
+      }
+    } else {
+      const existing = AppState.participants.find(
+        p => p.email === email && p.category === category
+      );
+      if (existing?.id) {
+        AppState.contestant.participantId = existing.id;
       }
     }
 
