@@ -329,6 +329,7 @@ const Results = (() => {
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
+<meta name="viewport" content="width=820"/>
 <title>${_escHtml(catName)} — ${_escHtml(contestName)}</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap');
@@ -377,7 +378,15 @@ tr.r1 td{background:rgba(255,215,0,.05);}tr.r2 td{background:rgba(184,196,216,.0
 tr.r3 td{background:rgba(205,139,74,.035);}tr.re td{background:rgba(255,255,255,.009);}
 tr.r1 td.pos{color:var(--gd);font-size:.88rem;}tr.r2 td.pos{color:var(--sv);font-size:.88rem;}tr.r3 td.pos{color:var(--bz);font-size:.88rem;}
 .ft{display:flex;justify-content:space-between;margin-top:8px;font-family:var(--mo);font-size:.5rem;color:var(--mu);}
-@media print{body{background:#fff;color:#111;width:100%;}:root{--bg:#fff;--sf:#f5f6fa;--sf2:#eaecf4;--tx:#111;--mu:#888;--m2:#666;--bd:rgba(0,0,0,.1);--ac:#1a5cb8;--a2:#c0103a;--a3:#8a6000;--a4:#0f7a5f;--gd:#b8860b;--sv:#666;--bz:#8b5e00;}}
+@media print{
+  body{background:#fff;color:#111;width:100%;max-width:100%;}
+  :root{--bg:#fff;--sf:#f5f6fa;--sf2:#eaecf4;--tx:#111;--mu:#888;--m2:#666;--bd:rgba(0,0,0,.1);--ac:#1a5cb8;--a2:#c0103a;--a3:#8a6000;--a4:#0f7a5f;--gd:#b8860b;--sv:#666;--bz:#8b5e00;}
+  table{font-size:.6rem;width:100%;}
+  thead th,tbody td{padding:3px 5px;white-space:normal;}
+  td.name{font-size:.65rem;}
+  .tbl-wrap{overflow:visible;}
+  .pod{grid-template-columns:repeat(3,1fr);}
+}
 </style>
 </head>
 <body>
