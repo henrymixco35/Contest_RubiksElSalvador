@@ -41,7 +41,7 @@ const Timer = (() => {
   }
 
   /* ── Constantes ─────────────────────────────────────── */
-  const HOLD_MS       = 600;
+  const HOLD_MS       = 550;
   const INSPECTION_MS = 15000;
   const PLUS2_END_MS  = 17000;
   const MO3_CATS      = new Set(['6x6', '7x7']);
